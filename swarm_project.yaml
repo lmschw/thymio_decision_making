@@ -1,0 +1,9 @@
+name: Decision Making Swarm Project
+
+version: 1.0
+
+experiments:
+  obstacle_avoidance:
+    class: experiments.obstacle_avoidance.ObstacleAvoidanceExperiment
+  weighted_voter_model:
+    class: experiments.weighted_voter_model.WeightedVoterExperiment
