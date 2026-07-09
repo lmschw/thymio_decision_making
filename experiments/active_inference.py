@@ -1,10 +1,10 @@
 import asyncio
 
 from behaviours.obstacle_avoidance import ObstacleAvoidance
-from behaviours.option_ground_sensor import OptionGroundSensor
-from behaviours.active_inference_beliefs import ActiveInferenceBeliefs
-from behaviours.efe_policy import EFEPolicy
-from behaviours.comm_protocol import encode_message, decode_message
+from behaviours.decision_making.option_ground_sensor import OptionGroundSensor
+from behaviours.active_inference.active_inference_beliefs import ActiveInferenceBeliefs
+from behaviours.active_inference.efe_policy import EFEPolicy
+from behaviours.decision_making.comm_protocol import encode_message, decode_message
 
 
 OPINION_COLORS = [
