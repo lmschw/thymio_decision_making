@@ -12,6 +12,7 @@ class ColourTestExperiment:
 
     async def run(self):
         counter = 0
+        max_counter = 12
         while self.running:
 
             if self.paused:
@@ -19,12 +20,12 @@ class ColourTestExperiment:
                 await asyncio.sleep(0.1)
                 continue
 
-            if counter < 3:
+            if counter < max_counter/2:
                 await self.robot.drive(50, 50)
             else:
                 await self.robot.drive(-50, -50)
 
-            counter = counter % 6
+            counter = counter % max_counter
 
             reflected = await self.robot.proximity_ground_reflected()
 
