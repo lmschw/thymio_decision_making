@@ -1,10 +1,10 @@
 import asyncio
 
 from behaviours.obstacle_avoidance import ObstacleAvoidance
-from behaviours.decision_making.option_ground_sensor import OptionGroundSensor
-from behaviours.active_inference.active_inference_beliefs import ActiveInferenceBeliefs
-from behaviours.active_inference.efe_policy import EFEPolicy
-from behaviours.decision_making.comm_protocol import encode_message, decode_message
+from behaviours.option_ground_sensor import OptionGroundSensor
+from behaviours.active_inference_beliefs import ActiveInferenceBeliefs
+from behaviours.efe_policy import EFEPolicy
+from behaviours.comm_protocol import encode_message, decode_message
 
 
 OPINION_COLORS = [
@@ -13,6 +13,13 @@ OPINION_COLORS = [
     (0, 0, 32),   # option 2 -> blue
     (32, 32, 0),  # option 3 -> yellow
 ]
+
+
+def _pad(values, length):
+    """Right-pads a list with "" so mu_0..3/tau_0..3/pb_0..3 always have
+    a value to log even when num_options < 4."""
+    values = list(values)[:length]
+    return values + [""] * (length - len(values))
 
 
 class ActiveInferenceExperiment:
@@ -53,6 +60,11 @@ class ActiveInferenceExperiment:
         self.running = True
         self.paused = False
 
+        # --- identity, for the shared CSV log ---
+        self.robot_id = self.config.get("robot_id", "")
+        self.env_state = self.config.get("env_state")     # e.g. pre/post-swap marker, if driven externally
+        self.true_best = self.config.get("true_best")      # ground-truth best option index, if known
+
         # --- motion params ---
         self.delta = self.config.get("delta", 1000)
         self.wheel_velocity = self.config.get("wheel_velocity", 300)
@@ -66,9 +78,9 @@ class ActiveInferenceExperiment:
         # --- decision-making params ---
         self.num_options = self.config.get("num_options", 3)
 
-        option_qualities = self.config.get("option_qualities", None)
+        option_qualities = self.config.get("option_qualities")
         if option_qualities is None:
-            option_qualities = [1, 2, 3]
+            option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
@@ -78,7 +90,7 @@ class ActiveInferenceExperiment:
 
         self.ground_sensor = OptionGroundSensor(
             num_options=self.num_options,
-            option_centers=self.config.get("option_centers", None),
+            option_centers=self.config.get("option_centers"),
             allowed_offset=self.config.get("allowed_offset", 50),
         )
 
@@ -102,6 +114,15 @@ class ActiveInferenceExperiment:
         self.since_decision = 0
         self.opinion = -1
 
+        # --- bookkeeping for the shared CSV log ---
+        self.tick_count = 0
+        self.msgs_tx_total = 0
+        self.msgs_rx_total = 0
+        self.explore_total = 0
+        self.exploit_total = 0
+        self.last_explore_bout = 0
+        self.last_exploit_bout = 0
+
     async def run(self):
 
         while self.running:
@@ -119,23 +140,26 @@ class ActiveInferenceExperiment:
                 # leave the last drive() command latched on the motors.
                 # Stop, log, and keep going.
                 await self.robot.stop()
-                if self.logger:
-                    self.logger.log(
-                        state={"error": repr(exc)},
-                        command={"left_motor": 0, "right_motor": 0},
-                    )
+                print(f"[ActiveInferenceExperiment] tick error, motors stopped: {exc!r}")
 
             await asyncio.sleep(0.05)
 
         await self.robot.stop()
 
     async def _tick(self):
+            self.tick_count += 1
+
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
 
+            # Detected patch, for logging, regardless of phase.
+            opt_idx, _avg_ground = self.ground_sensor.detect_option(reflected)
+
+            msgs_tx_tick = 0
+            msgs_rx_tick = 0
+
             # --- belief update ---
             if not self.disseminating:
-                opt_idx, _avg_ground = self.ground_sensor.detect_option(reflected)
                 sampled = self.beliefs.update_from_ground(opt_idx)
                 if sampled and self.opinion < 0:
                     self.opinion = opt_idx
@@ -148,6 +172,8 @@ class ActiveInferenceExperiment:
                     # treat as "nothing received" rather than crashing.
                     incoming = None
                 if incoming is not None:
+                    msgs_rx_tick = 1
+                    self.msgs_rx_total += 1
                     op, q_msg, c_msg = decode_message(incoming)
                     self.beliefs.update_from_message(op, q_msg, c_msg)
 
@@ -172,8 +198,17 @@ class ActiveInferenceExperiment:
                 want_dissem = False
 
             if can_switch and want_dissem != self.disseminating:
+                if self.disseminating:
+                    self.last_exploit_bout = self.phase_ticks
+                else:
+                    self.last_explore_bout = self.phase_ticks
                 self.disseminating = want_dissem
                 self.phase_ticks = 0
+
+            if self.disseminating:
+                self.exploit_total += 1
+            else:
+                self.explore_total += 1
 
             # --- communicate ---
             if self.disseminating and self.opinion >= 0:
@@ -181,6 +216,8 @@ class ActiveInferenceExperiment:
                 confidence = max(0.05, self.beliefs.epistemic_confidence())
                 await self.robot.send(
                     encode_message(self.opinion, quality, confidence))
+                msgs_tx_tick = 1
+                self.msgs_tx_total += 1
 
             # --- motion ---
             left, right = self.obstacle_avoidance.step_motion(prox)
@@ -194,29 +231,43 @@ class ActiveInferenceExperiment:
             await self.robot.top_led(r, g, b)
 
             if self.logger:
-                self.logger.log(
-                    state={
-                        "proximity": prox,
-                        "reflected_0": reflected[0] if len(reflected) > 0 else None,
-                        "reflected_1": reflected[1] if len(reflected) > 1 else None,
-                        "opinion": self.opinion,
-                        "disseminating": self.disseminating,
-                        "mu_q": list(self.beliefs.mu_q),
-                        "tau_q": list(self.beliefs.tau_q),
-                        "belief_best": list(self.beliefs.belief_best),
-                        "expected_quality": self.beliefs.expected_quality(),
-                        "p_dissem": self.policy.last["p_dissem"],
-                        "g_explore": self.policy.last["g_explore"],
-                        "g_dissem": self.policy.last["g_dissem"],
-                        "ig_explore": self.policy.last["ig_explore"],
-                        "ig_dissem": self.policy.last["ig_dissem"],
-                        "pragmatic": self.policy.last["pragmatic"],
-                    },
-                    command={
-                        "left_motor": left,
-                        "right_motor": right,
-                        "led": (r, g, b),
-                    },
+                mu = _pad(self.beliefs.mu_q, 4)
+                tau = _pad(self.beliefs.tau_q, 4)
+                pb = _pad(self.beliefs.belief_best, 4)
+                correct = ("" if self.true_best is None
+                           else int(self.opinion == self.true_best))
+                await self.logger.log(
+                    tick=self.tick_count,
+                    ctrl_variant="active_inference",
+                    robot_id=self.robot_id,
+                    patch=opt_idx,
+                    q_est=round(self.beliefs.expected_quality(), 6),
+                    opinion=self.opinion,
+                    flag=1 if self.disseminating else 0,
+                    explore_total=self.explore_total,
+                    exploit_total=self.exploit_total,
+                    last_explore_bout=self.last_explore_bout,
+                    last_exploit_bout=self.last_exploit_bout,
+                    ticks_in_phase=self.phase_ticks,
+                    msgs_tx_tick=msgs_tx_tick,
+                    msgs_rx_tick=msgs_rx_tick,
+                    msgs_tx_total=self.msgs_tx_total,
+                    msgs_rx_total=self.msgs_rx_total,
+                    env_state=self.env_state,
+                    belief_entropy=round(self.beliefs.belief_entropy01(), 6),
+                    epistemic_confidence=round(self.beliefs.epistemic_confidence(), 6),
+                    p_dissem=self.policy.last["p_dissem"],
+                    g_explore=self.policy.last["g_explore"],
+                    g_dissem=self.policy.last["g_dissem"],
+                    efe_margin=self.policy.last["g_dissem"] - self.policy.last["g_explore"],
+                    ig_explore=self.policy.last["ig_explore"],
+                    ig_dissem=self.policy.last["ig_dissem"],
+                    pragmatic=self.policy.last["pragmatic"],
+                    mu_0=mu[0], mu_1=mu[1], mu_2=mu[2], mu_3=mu[3],
+                    tau_0=tau[0], tau_1=tau[1], tau_2=tau[2], tau_3=tau[3],
+                    pb_0=pb[0], pb_1=pb[1], pb_2=pb[2], pb_3=pb[3],
+                    true_best=self.true_best,
+                    correct=correct,
                 )
 
     async def pause(self):

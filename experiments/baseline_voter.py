@@ -1,9 +1,9 @@
 import asyncio
 
 from behaviours.obstacle_avoidance import ObstacleAvoidance
-from behaviours.decision_making.option_ground_sensor import OptionGroundSensor
-from behaviours.baseline.voter_model import noisy_measure, process_one_neighbor_message
-from behaviours.decision_making.comm_protocol import encode_message, decode_message
+from behaviours.option_ground_sensor import OptionGroundSensor
+from behaviours.voter_model import noisy_measure, process_one_neighbor_message
+from behaviours.comm_protocol import encode_message, decode_message
 
 
 OPINION_COLORS = [
@@ -51,6 +51,11 @@ class BaselineVoterExperiment:
         self.running = True
         self.paused = False
 
+        # --- identity, for the shared CSV log ---
+        self.robot_id = self.config.get("robot_id", "")
+        self.env_state = self.config.get("env_state")
+        self.true_best = self.config.get("true_best")
+
         # --- motion params ---
         self.delta = self.config.get("delta", 1000)
         self.wheel_velocity = self.config.get("wheel_velocity", 300)
@@ -81,7 +86,7 @@ class BaselineVoterExperiment:
 
         self.ground_sensor = OptionGroundSensor(
             num_options=self.num_options,
-            option_centers=self.config.get("option_centers", None),
+            option_centers=self.config.get("option_centers"),
             allowed_offset=self.config.get("allowed_offset", 50),
         )
 
@@ -93,6 +98,16 @@ class BaselineVoterExperiment:
         self.disseminating = False
         self.expl_timer = 0
         self.dissem_timer = 0
+        self.phase_ticks = 0  # generic ticks-in-current-phase, for logging/bout length
+
+        # --- bookkeeping for the shared CSV log ---
+        self.tick_count = 0
+        self.msgs_tx_total = 0
+        self.msgs_rx_total = 0
+        self.explore_total = 0
+        self.exploit_total = 0
+        self.last_explore_bout = 0
+        self.last_exploit_bout = 0
 
     async def run(self):
         while self.running:
@@ -109,19 +124,24 @@ class BaselineVoterExperiment:
                 # because no message has arrived yet) kill the loop and
                 # leave the last drive() command latched on the motors.
                 await self.robot.stop()
-                if self.logger:
-                    self.logger.log(
-                        state={"error": repr(exc)},
-                        command={"left_motor": 0, "right_motor": 0},
-                    )
+                print(f"[BaselineVoterExperiment] tick error, motors stopped: {exc!r}")
 
             await asyncio.sleep(0.05)
 
         await self.robot.stop()
 
     async def _tick(self):
+        self.tick_count += 1
+
         prox = await self.robot.proximity_horizontal()
         reflected = await self.robot.proximity_ground_reflected()
+
+        # Detected patch, for logging, regardless of phase.
+        opt_idx, _avg = self.ground_sensor.detect_option(reflected)
+
+        msgs_tx_tick = 0
+        msgs_rx_tick = 0
+        self.phase_ticks += 1
 
         if not self.disseminating:
             # --- EXPLORE ---
@@ -130,7 +150,7 @@ class BaselineVoterExperiment:
             else:
                 self.expl_timer = 0
 
-            self._update_estimate_from_ground(reflected)
+            self._update_estimate_from_ground(opt_idx)
 
             # Timer-only trigger: the quality estimate above never flips
             # the phase itself - only expl_timer reaching expl_max_ticks does.
@@ -139,6 +159,8 @@ class BaselineVoterExperiment:
                 self.dissem_timer = self.tau0 + int(self.tau_gain * q)
                 self.disseminating = True
                 self.expl_timer = 0
+                self.last_explore_bout = self.phase_ticks
+                self.phase_ticks = 0
         else:
             # --- DISSEMINATE ---
             if self.opinion >= 0:
@@ -146,6 +168,8 @@ class BaselineVoterExperiment:
                 # use a confidence-weighted update like the AIF variant does.
                 await self.robot.send(
                     encode_message(self.opinion, self.q_est, 1.0))
+                msgs_tx_tick = 1
+                self.msgs_tx_total += 1
 
             incoming = None
             try:
@@ -154,6 +178,8 @@ class BaselineVoterExperiment:
                 # No message present yet - treat as "nothing received".
                 incoming = None
             if incoming is not None:
+                msgs_rx_tick = 1
+                self.msgs_rx_total += 1
                 other_op, other_q, _other_conf = decode_message(incoming)
                 self.opinion, self.q_est = process_one_neighbor_message(
                     self.opinion, self.q_est, other_op, other_q,
@@ -163,6 +189,13 @@ class BaselineVoterExperiment:
                 self.dissem_timer -= 1
             if self.dissem_timer == 0:
                 self.disseminating = False
+                self.last_exploit_bout = self.phase_ticks
+                self.phase_ticks = 0
+
+        if self.disseminating:
+            self.exploit_total += 1
+        else:
+            self.explore_total += 1
 
         # --- motion ---
         left, right = self.obstacle_avoidance.step_motion(prox)
@@ -176,25 +209,31 @@ class BaselineVoterExperiment:
         await self.robot.top_led(r, g, b)
 
         if self.logger:
-            self.logger.log(
-                state={
-                    "proximity": prox,
-                    "reflected_0": reflected[0] if len(reflected) > 0 else None,
-                    "reflected_1": reflected[1] if len(reflected) > 1 else None,
-                    "opinion": self.opinion,
-                    "q_est": self.q_est,
-                    "disseminating": self.disseminating,
-                    "expl_timer": self.expl_timer,
-                    "dissem_timer": self.dissem_timer,
-                },
-                command={
-                    "left_motor": left,
-                    "right_motor": right,
-                    "led": (r, g, b),
-                },
+            correct = ("" if self.true_best is None
+                       else int(self.opinion == self.true_best))
+            await self.logger.log(
+                tick=self.tick_count,
+                ctrl_variant="baseline",
+                robot_id=self.robot_id,
+                patch=opt_idx,
+                q_est=round(self.q_est, 6),
+                opinion=self.opinion,
+                flag=1 if self.disseminating else 0,
+                explore_total=self.explore_total,
+                exploit_total=self.exploit_total,
+                last_explore_bout=self.last_explore_bout,
+                last_exploit_bout=self.last_exploit_bout,
+                ticks_in_phase=self.phase_ticks,
+                msgs_tx_tick=msgs_tx_tick,
+                msgs_rx_tick=msgs_rx_tick,
+                msgs_tx_total=self.msgs_tx_total,
+                msgs_rx_total=self.msgs_rx_total,
+                env_state=self.env_state,
+                true_best=self.true_best,
+                correct=correct,
             )
 
-    def _update_estimate_from_ground(self, reflected):
+    def _update_estimate_from_ground(self, opt_idx):
         """
         Port of UpdateEstimateFromGround: refreshes q_est whenever the
         robot is on the patch matching its current opinion, or adopts a
@@ -202,7 +241,6 @@ class BaselineVoterExperiment:
         was updated (this return value is deliberately NOT used to trigger
         the phase switch, matching the ARGoS controller).
         """
-        opt_idx, _avg = self.ground_sensor.detect_option(reflected)
         if opt_idx < 0 or opt_idx >= len(self.option_qualities):
             return False
         q = noisy_measure(self.option_qualities[opt_idx], self.noise_sigma)
