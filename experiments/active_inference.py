@@ -117,6 +117,25 @@ class ActiveInferenceExperiment:
                 await asyncio.sleep(0.05)
                 continue
 
+            try:
+                await self._tick()
+            except Exception as exc:
+                # Never let a single bad tick (e.g. a comms read failing
+                # because no message has arrived yet) kill the loop and
+                # leave the last drive() command latched on the motors.
+                # Stop, log, and keep going.
+                await self.robot.stop()
+                if self.logger:
+                    self.logger.log(
+                        state={"error": repr(exc)},
+                        command={"left_motor": 0, "right_motor": 0},
+                    )
+
+            await asyncio.sleep(0.05)
+
+        await self.robot.stop()
+
+    async def _tick(self):
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
 
@@ -127,7 +146,13 @@ class ActiveInferenceExperiment:
                 if sampled and self.opinion < 0:
                     self.opinion = opt_idx
             else:
-                incoming = await self.robot.receive()
+                incoming = None
+                try:
+                    incoming = await self.robot.receive()
+                except (TypeError, ValueError):
+                    # No message present yet (prox.comm.rx not populated) -
+                    # treat as "nothing received" rather than crashing.
+                    incoming = None
                 if incoming is not None:
                     op, q_msg, c_msg = decode_message(incoming)
                     self.beliefs.update_from_message(op, q_msg, c_msg)
@@ -156,53 +181,49 @@ class ActiveInferenceExperiment:
                 self.disseminating = want_dissem
                 self.phase_ticks = 0
 
-            # # --- communicate ---
-            # if self.disseminating and self.opinion >= 0:
-            #     quality = self.beliefs.mu_q[self.opinion]
-            #     confidence = max(0.05, self.beliefs.epistemic_confidence())
-            #     await self.robot.send(
-            #         encode_message(self.opinion, quality, confidence))
+            # --- communicate ---
+            if self.disseminating and self.opinion >= 0:
+                quality = self.beliefs.mu_q[self.opinion]
+                confidence = max(0.05, self.beliefs.epistemic_confidence())
+                await self.robot.send(
+                    encode_message(self.opinion, quality, confidence))
 
             # --- motion ---
             left, right = self.obstacle_avoidance.step_motion(prox)
             await self.robot.drive(left, right)
 
-            # # --- LEDs: colour = current opinion ---
-            # if 0 <= self.opinion < len(OPINION_COLORS):
-            #     r, g, b = OPINION_COLORS[self.opinion]
-            # else:
-            #     r, g, b = (0, 0, 0)
-            # await self.robot.top_led(r, g, b)
+            # --- LEDs: colour = current opinion ---
+            if 0 <= self.opinion < len(OPINION_COLORS):
+                r, g, b = OPINION_COLORS[self.opinion]
+            else:
+                r, g, b = (0, 0, 0)
+            await self.robot.top_led(r, g, b)
 
-            # if self.logger:
-            #     self.logger.log(
-            #         state={
-            #             "proximity": prox,
-            #             "reflected_0": reflected[0] if len(reflected) > 0 else None,
-            #             "reflected_1": reflected[1] if len(reflected) > 1 else None,
-            #             "opinion": self.opinion,
-            #             "disseminating": self.disseminating,
-            #             "mu_q": list(self.beliefs.mu_q),
-            #             "tau_q": list(self.beliefs.tau_q),
-            #             "belief_best": list(self.beliefs.belief_best),
-            #             "expected_quality": self.beliefs.expected_quality(),
-            #             "p_dissem": self.policy.last["p_dissem"],
-            #             "g_explore": self.policy.last["g_explore"],
-            #             "g_dissem": self.policy.last["g_dissem"],
-            #             "ig_explore": self.policy.last["ig_explore"],
-            #             "ig_dissem": self.policy.last["ig_dissem"],
-            #             "pragmatic": self.policy.last["pragmatic"],
-            #         },
-            #         command={
-            #             "left_motor": left,
-            #             "right_motor": right,
-            #             "led": (r, g, b),
-            #         },
-            #     )
-
-            await asyncio.sleep(0.05)
-
-        await self.robot.stop()
+            if self.logger:
+                self.logger.log(
+                    state={
+                        "proximity": prox,
+                        "reflected_0": reflected[0] if len(reflected) > 0 else None,
+                        "reflected_1": reflected[1] if len(reflected) > 1 else None,
+                        "opinion": self.opinion,
+                        "disseminating": self.disseminating,
+                        "mu_q": list(self.beliefs.mu_q),
+                        "tau_q": list(self.beliefs.tau_q),
+                        "belief_best": list(self.beliefs.belief_best),
+                        "expected_quality": self.beliefs.expected_quality(),
+                        "p_dissem": self.policy.last["p_dissem"],
+                        "g_explore": self.policy.last["g_explore"],
+                        "g_dissem": self.policy.last["g_dissem"],
+                        "ig_explore": self.policy.last["ig_explore"],
+                        "ig_dissem": self.policy.last["ig_dissem"],
+                        "pragmatic": self.policy.last["pragmatic"],
+                    },
+                    command={
+                        "left_motor": left,
+                        "right_motor": right,
+                        "led": (r, g, b),
+                    },
+                )
 
     async def pause(self):
         self.paused = True
