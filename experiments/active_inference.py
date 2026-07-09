@@ -236,39 +236,52 @@ class ActiveInferenceExperiment:
                 pb = _pad(self.beliefs.belief_best, 4)
                 correct = ("" if self.true_best is None
                            else int(self.opinion == self.true_best))
-                await self.logger.log(
-                    tick=self.tick_count,
-                    ctrl_variant="active_inference",
-                    robot_id=self.robot_id,
-                    patch=opt_idx,
-                    q_est=round(self.beliefs.expected_quality(), 6),
-                    opinion=self.opinion,
-                    flag=1 if self.disseminating else 0,
-                    explore_total=self.explore_total,
-                    exploit_total=self.exploit_total,
-                    last_explore_bout=self.last_explore_bout,
-                    last_exploit_bout=self.last_exploit_bout,
-                    ticks_in_phase=self.phase_ticks,
-                    msgs_tx_tick=msgs_tx_tick,
-                    msgs_rx_tick=msgs_rx_tick,
-                    msgs_tx_total=self.msgs_tx_total,
-                    msgs_rx_total=self.msgs_rx_total,
-                    env_state=self.env_state,
-                    belief_entropy=round(self.beliefs.belief_entropy01(), 6),
-                    epistemic_confidence=round(self.beliefs.epistemic_confidence(), 6),
-                    p_dissem=self.policy.last["p_dissem"],
-                    g_explore=self.policy.last["g_explore"],
-                    g_dissem=self.policy.last["g_dissem"],
-                    efe_margin=self.policy.last["g_dissem"] - self.policy.last["g_explore"],
-                    ig_explore=self.policy.last["ig_explore"],
-                    ig_dissem=self.policy.last["ig_dissem"],
-                    pragmatic=self.policy.last["pragmatic"],
-                    mu_0=mu[0], mu_1=mu[1], mu_2=mu[2], mu_3=mu[3],
-                    tau_0=tau[0], tau_1=tau[1], tau_2=tau[2], tau_3=tau[3],
-                    pb_0=pb[0], pb_1=pb[1], pb_2=pb[2], pb_3=pb[3],
-                    true_best=self.true_best,
-                    correct=correct,
-                )
+                try:
+                    self.logger.log(
+                        state={
+                            "tick": self.tick_count,
+                            "ctrl_variant": "active_inference",
+                            "robot_id": self.robot_id,
+                            "patch": opt_idx,
+                            "q_est": round(self.beliefs.expected_quality(), 6),
+                            "opinion": self.opinion,
+                            "flag": 1 if self.disseminating else 0,
+                            "explore_total": self.explore_total,
+                            "exploit_total": self.exploit_total,
+                            "last_explore_bout": self.last_explore_bout,
+                            "last_exploit_bout": self.last_exploit_bout,
+                            "ticks_in_phase": self.phase_ticks,
+                            "msgs_tx_tick": msgs_tx_tick,
+                            "msgs_rx_tick": msgs_rx_tick,
+                            "msgs_tx_total": self.msgs_tx_total,
+                            "msgs_rx_total": self.msgs_rx_total,
+                            "env_state": self.env_state,
+                            "belief_entropy": round(self.beliefs.belief_entropy01(), 6),
+                            "epistemic_confidence": round(self.beliefs.epistemic_confidence(), 6),
+                            "p_dissem": self.policy.last["p_dissem"],
+                            "g_explore": self.policy.last["g_explore"],
+                            "g_dissem": self.policy.last["g_dissem"],
+                            "efe_margin": self.policy.last["g_dissem"] - self.policy.last["g_explore"],
+                            "ig_explore": self.policy.last["ig_explore"],
+                            "ig_dissem": self.policy.last["ig_dissem"],
+                            "pragmatic": self.policy.last["pragmatic"],
+                            "mu_0": mu[0], "mu_1": mu[1], "mu_2": mu[2], "mu_3": mu[3],
+                            "tau_0": tau[0], "tau_1": tau[1], "tau_2": tau[2], "tau_3": tau[3],
+                            "pb_0": pb[0], "pb_1": pb[1], "pb_2": pb[2], "pb_3": pb[3],
+                            "true_best": self.true_best,
+                            "correct": correct,
+                        },
+                        command={
+                            "left_motor": left,
+                            "right_motor": right,
+                            "led_r": r, "led_g": g, "led_b": b,
+                        },
+                    )
+                except Exception as log_exc:
+                    # A logging failure must NEVER stop the robot. Print and
+                    # move on - motion for this tick already happened above.
+                    print(f"[ActiveInferenceExperiment] logging failed "
+                          f"(motors unaffected): {log_exc!r}")
 
     async def pause(self):
         self.paused = True

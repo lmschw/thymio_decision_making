@@ -208,30 +208,43 @@ class BaselineVoterExperiment:
             r, g, b = (0, 0, 0)
         await self.robot.top_led(r, g, b)
 
-        # if self.logger:
-        #     correct = ("" if self.true_best is None
-        #                else int(self.opinion == self.true_best))
-        #     await self.logger.log(
-        #         tick=self.tick_count,
-        #         ctrl_variant="baseline",
-        #         robot_id=self.robot_id,
-        #         patch=opt_idx,
-        #         q_est=round(self.q_est, 6),
-        #         opinion=self.opinion,
-        #         flag=1 if self.disseminating else 0,
-        #         explore_total=self.explore_total,
-        #         exploit_total=self.exploit_total,
-        #         last_explore_bout=self.last_explore_bout,
-        #         last_exploit_bout=self.last_exploit_bout,
-        #         ticks_in_phase=self.phase_ticks,
-        #         msgs_tx_tick=msgs_tx_tick,
-        #         msgs_rx_tick=msgs_rx_tick,
-        #         msgs_tx_total=self.msgs_tx_total,
-        #         msgs_rx_total=self.msgs_rx_total,
-        #         env_state=self.env_state,
-        #         true_best=self.true_best,
-        #         correct=correct,
-            # )
+        if self.logger:
+            correct = ("" if self.true_best is None
+                       else int(self.opinion == self.true_best))
+            try:
+                self.logger.log(
+                    state={
+                        "tick": self.tick_count,
+                        "ctrl_variant": "baseline",
+                        "robot_id": self.robot_id,
+                        "patch": opt_idx,
+                        "q_est": round(self.q_est, 6),
+                        "opinion": self.opinion,
+                        "flag": 1 if self.disseminating else 0,
+                        "explore_total": self.explore_total,
+                        "exploit_total": self.exploit_total,
+                        "last_explore_bout": self.last_explore_bout,
+                        "last_exploit_bout": self.last_exploit_bout,
+                        "ticks_in_phase": self.phase_ticks,
+                        "msgs_tx_tick": msgs_tx_tick,
+                        "msgs_rx_tick": msgs_rx_tick,
+                        "msgs_tx_total": self.msgs_tx_total,
+                        "msgs_rx_total": self.msgs_rx_total,
+                        "env_state": self.env_state,
+                        "true_best": self.true_best,
+                        "correct": correct,
+                    },
+                    command={
+                        "left_motor": left,
+                        "right_motor": right,
+                        "led_r": r, "led_g": g, "led_b": b,
+                    },
+                )
+            except Exception as log_exc:
+                # A logging failure must NEVER stop the robot. Print and
+                # move on - motion for this tick already happened above.
+                print(f"[BaselineVoterExperiment] logging failed "
+                      f"(motors unaffected): {log_exc!r}")
 
     def _update_estimate_from_ground(self, opt_idx):
         """
