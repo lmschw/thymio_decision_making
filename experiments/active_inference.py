@@ -120,17 +120,17 @@ class ActiveInferenceExperiment:
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
 
-            # # --- belief update ---
-            # if not self.disseminating:
-            #     opt_idx, _avg_ground = self.ground_sensor.detect_option(reflected)
-            #     sampled = self.beliefs.update_from_ground(opt_idx)
-            #     if sampled and self.opinion < 0:
-            #         self.opinion = opt_idx
-            # else:
-            #     incoming = await self.robot.receive()
-            #     if incoming is not None:
-            #         op, q_msg, c_msg = decode_message(incoming)
-            #         self.beliefs.update_from_message(op, q_msg, c_msg)
+            # --- belief update ---
+            if not self.disseminating:
+                opt_idx, _avg_ground = self.ground_sensor.detect_option(reflected)
+                sampled = self.beliefs.update_from_ground(opt_idx)
+                if sampled and self.opinion < 0:
+                    self.opinion = opt_idx
+            else:
+                incoming = await self.robot.receive()
+                if incoming is not None:
+                    op, q_msg, c_msg = decode_message(incoming)
+                    self.beliefs.update_from_message(op, q_msg, c_msg)
 
             # self.beliefs.decay_precision()
             # self.beliefs.recompute_belief_best()
