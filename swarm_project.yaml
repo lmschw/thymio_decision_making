@@ -9,3 +9,5 @@ experiments:
     class: experiments.colour_test.ColourTestExperiment
   obstacle_avoidance:
     class: experiments.obstacle_avoidance.ObstacleAvoidanceExperiment
+  active_inference:
+    class: experiments.active_inference.ActiveInferenceExperiment
