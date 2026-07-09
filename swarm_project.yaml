@@ -3,7 +3,9 @@ name: Decision Making Swarm Project
 version: 1.0
 
 experiments:
-  obstacle_avoidance:
-    class: experiments.obstacle_avoidance.ObstacleAvoidanceExperiment
+  colour_recognition:
+    class: experiments.colour_recognition.ColourRecognitionExperiment
   colour_test:
     class: experiments.colour_test.ColourTestExperiment
+  obstacle_avoidance:
+    class: experiments.obstacle_avoidance.ObstacleAvoidanceExperiment
