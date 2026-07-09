@@ -25,6 +25,7 @@ class ColourTestExperiment:
             else:
                 await self.robot.drive(-50, -50)
 
+            counter += 1
             counter = counter % max_counter
 
             reflected = await self.robot.proximity_ground_reflected()
