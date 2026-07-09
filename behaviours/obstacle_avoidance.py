@@ -18,24 +18,23 @@ class ObstacleAvoidance:
         # Separate, smaller threshold for the *averaged* resultant vector
         # (7 raw values averaged together will basically never reach `delta`,
         # so gating "go straight" on the same threshold made it unreachable).
-        self.straight_length_threshold = self.config.get(
-            "straight_length_threshold", self.delta / 3
+        self.straight_length_threshold = self.delta / 3
         )
         # Wider "go straight" cone than the original 10 degrees, which was
         # tight enough that noise alone kept kicking the robot into the
         # correction branch.
-        self.straight_range = math.radians(self.config.get("straight_range_deg", 25))
+        self.straight_range = math.radians(25)
 
         # Hysteresis: ignore direction flips smaller than this when the
         # resultant angle is close to zero, to stop side-to-side jitter.
-        self.angle_deadzone = math.radians(self.config.get("angle_deadzone_deg", 5))
+        self.angle_deadzone = math.radians( 5)
         self._last_steer_angle = 0.0
 
         # Corner/stuck detection: count consecutive front-avoidance triggers.
         # If we keep re-triggering front avoidance without a break, we're
         # probably stuck pivoting in a corner -> back up instead.
-        self.stuck_trigger_limit = self.config.get("stuck_trigger_limit", 3)
-        self.reverse_steps = self.config.get("reverse_steps", 6)
+        self.stuck_trigger_limit = 3
+        self.reverse_steps = 6
         self._front_trigger_streak = 0
         self.reversing = 0
 
