@@ -120,85 +120,85 @@ class ActiveInferenceExperiment:
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
 
-            # --- belief update ---
-            if not self.disseminating:
-                opt_idx, _avg_ground = self.ground_sensor.detect_option(reflected)
-                sampled = self.beliefs.update_from_ground(opt_idx)
-                if sampled and self.opinion < 0:
-                    self.opinion = opt_idx
-            else:
-                incoming = await self.robot.receive()
-                if incoming is not None:
-                    op, q_msg, c_msg = decode_message(incoming)
-                    self.beliefs.update_from_message(op, q_msg, c_msg)
+            # # --- belief update ---
+            # if not self.disseminating:
+            #     opt_idx, _avg_ground = self.ground_sensor.detect_option(reflected)
+            #     sampled = self.beliefs.update_from_ground(opt_idx)
+            #     if sampled and self.opinion < 0:
+            #         self.opinion = opt_idx
+            # else:
+            #     incoming = await self.robot.receive()
+            #     if incoming is not None:
+            #         op, q_msg, c_msg = decode_message(incoming)
+            #         self.beliefs.update_from_message(op, q_msg, c_msg)
 
-            self.beliefs.decay_precision()
-            self.beliefs.recompute_belief_best()
+            # self.beliefs.decay_precision()
+            # self.beliefs.recompute_belief_best()
 
-            if self.beliefs.has_sampled_any:
-                self.opinion = self.beliefs.map_best_tiebreak_random()
+            # if self.beliefs.has_sampled_any:
+            #     self.opinion = self.beliefs.map_best_tiebreak_random()
 
-            # --- EFE policy: decide whether to switch phase ---
-            self.phase_ticks += 1
-            self.since_decision += 1
-            can_switch = self.phase_ticks >= self.min_dwell
-            want_dissem = self.disseminating
+            # # --- EFE policy: decide whether to switch phase ---
+            # self.phase_ticks += 1
+            # self.since_decision += 1
+            # can_switch = self.phase_ticks >= self.min_dwell
+            # want_dissem = self.disseminating
 
-            if (can_switch and self.beliefs.has_sampled_any
-                    and self.since_decision >= max(1, self.decide_every)):
-                want_dissem = self.policy.select_disseminate(self.beliefs)
-                self.since_decision = 0
+            # if (can_switch and self.beliefs.has_sampled_any
+            #         and self.since_decision >= max(1, self.decide_every)):
+            #     want_dissem = self.policy.select_disseminate(self.beliefs)
+            #     self.since_decision = 0
 
-            if not self.beliefs.has_sampled_any:
-                want_dissem = False
+            # if not self.beliefs.has_sampled_any:
+            #     want_dissem = False
 
-            if can_switch and want_dissem != self.disseminating:
-                self.disseminating = want_dissem
-                self.phase_ticks = 0
+            # if can_switch and want_dissem != self.disseminating:
+            #     self.disseminating = want_dissem
+            #     self.phase_ticks = 0
 
-            # --- communicate ---
-            if self.disseminating and self.opinion >= 0:
-                quality = self.beliefs.mu_q[self.opinion]
-                confidence = max(0.05, self.beliefs.epistemic_confidence())
-                await self.robot.send(
-                    encode_message(self.opinion, quality, confidence))
+            # # --- communicate ---
+            # if self.disseminating and self.opinion >= 0:
+            #     quality = self.beliefs.mu_q[self.opinion]
+            #     confidence = max(0.05, self.beliefs.epistemic_confidence())
+            #     await self.robot.send(
+            #         encode_message(self.opinion, quality, confidence))
 
             # --- motion ---
             left, right = self.obstacle_avoidance.step_motion(prox)
             await self.robot.drive(left, right)
 
-            # --- LEDs: colour = current opinion ---
-            if 0 <= self.opinion < len(OPINION_COLORS):
-                r, g, b = OPINION_COLORS[self.opinion]
-            else:
-                r, g, b = (0, 0, 0)
-            await self.robot.top_led(r, g, b)
+            # # --- LEDs: colour = current opinion ---
+            # if 0 <= self.opinion < len(OPINION_COLORS):
+            #     r, g, b = OPINION_COLORS[self.opinion]
+            # else:
+            #     r, g, b = (0, 0, 0)
+            # await self.robot.top_led(r, g, b)
 
-            if self.logger:
-                self.logger.log(
-                    state={
-                        "proximity": prox,
-                        "reflected_0": reflected[0] if len(reflected) > 0 else None,
-                        "reflected_1": reflected[1] if len(reflected) > 1 else None,
-                        "opinion": self.opinion,
-                        "disseminating": self.disseminating,
-                        "mu_q": list(self.beliefs.mu_q),
-                        "tau_q": list(self.beliefs.tau_q),
-                        "belief_best": list(self.beliefs.belief_best),
-                        "expected_quality": self.beliefs.expected_quality(),
-                        "p_dissem": self.policy.last["p_dissem"],
-                        "g_explore": self.policy.last["g_explore"],
-                        "g_dissem": self.policy.last["g_dissem"],
-                        "ig_explore": self.policy.last["ig_explore"],
-                        "ig_dissem": self.policy.last["ig_dissem"],
-                        "pragmatic": self.policy.last["pragmatic"],
-                    },
-                    command={
-                        "left_motor": left,
-                        "right_motor": right,
-                        "led": (r, g, b),
-                    },
-                )
+            # if self.logger:
+            #     self.logger.log(
+            #         state={
+            #             "proximity": prox,
+            #             "reflected_0": reflected[0] if len(reflected) > 0 else None,
+            #             "reflected_1": reflected[1] if len(reflected) > 1 else None,
+            #             "opinion": self.opinion,
+            #             "disseminating": self.disseminating,
+            #             "mu_q": list(self.beliefs.mu_q),
+            #             "tau_q": list(self.beliefs.tau_q),
+            #             "belief_best": list(self.beliefs.belief_best),
+            #             "expected_quality": self.beliefs.expected_quality(),
+            #             "p_dissem": self.policy.last["p_dissem"],
+            #             "g_explore": self.policy.last["g_explore"],
+            #             "g_dissem": self.policy.last["g_dissem"],
+            #             "ig_explore": self.policy.last["ig_explore"],
+            #             "ig_dissem": self.policy.last["ig_dissem"],
+            #             "pragmatic": self.policy.last["pragmatic"],
+            #         },
+            #         command={
+            #             "left_motor": left,
+            #             "right_motor": right,
+            #             "led": (r, g, b),
+            #         },
+            #     )
 
             await asyncio.sleep(0.05)
 
