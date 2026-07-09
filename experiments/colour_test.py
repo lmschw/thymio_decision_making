@@ -12,7 +12,7 @@ class ColourTestExperiment:
 
     async def run(self):
         counter = 0
-        max_counter = 20
+        max_counter = 10
         while self.running:
 
             if self.paused:
