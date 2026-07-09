@@ -49,7 +49,7 @@ class ColourRecognitionExperiment:
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
 
-            colour = await self.ground_sensor.sense_ground_colour(self.robot)
+            colour = await self.ground_sensor.sense_ground_colour(reflected)
 
             match colour:
                 case GroundColour.BLACK:

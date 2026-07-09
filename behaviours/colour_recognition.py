@@ -16,9 +16,7 @@ class GroundColourSensor:
 
     ALLOWED_COLOUR_OFFSET = 50
 
-    async def sense_ground_colour(self, robot) -> GroundColour:
-        reflected = await robot.proximity_ground_reflected()
-
+    async def sense_ground_colour(self, reflected) -> GroundColour:
         left = self._classify(reflected[0])
         right = self._classify(reflected[1])
 
