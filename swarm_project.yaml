@@ -7,3 +7,5 @@ experiments:
     class: experiments.obstacle_avoidance.ObstacleAvoidanceExperiment
   weighted_voter_model:
     class: experiments.weighted_voter_model.WeightedVoterExperiment
+  colour_test:
+    class: experiments.colour_test.py.ColourTestExperiment
