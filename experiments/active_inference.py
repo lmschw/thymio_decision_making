@@ -132,29 +132,29 @@ class ActiveInferenceExperiment:
                     op, q_msg, c_msg = decode_message(incoming)
                     self.beliefs.update_from_message(op, q_msg, c_msg)
 
-            # self.beliefs.decay_precision()
-            # self.beliefs.recompute_belief_best()
+            self.beliefs.decay_precision()
+            self.beliefs.recompute_belief_best()
 
-            # if self.beliefs.has_sampled_any:
-            #     self.opinion = self.beliefs.map_best_tiebreak_random()
+            if self.beliefs.has_sampled_any:
+                self.opinion = self.beliefs.map_best_tiebreak_random()
 
-            # # --- EFE policy: decide whether to switch phase ---
-            # self.phase_ticks += 1
-            # self.since_decision += 1
-            # can_switch = self.phase_ticks >= self.min_dwell
-            # want_dissem = self.disseminating
+            # --- EFE policy: decide whether to switch phase ---
+            self.phase_ticks += 1
+            self.since_decision += 1
+            can_switch = self.phase_ticks >= self.min_dwell
+            want_dissem = self.disseminating
 
-            # if (can_switch and self.beliefs.has_sampled_any
-            #         and self.since_decision >= max(1, self.decide_every)):
-            #     want_dissem = self.policy.select_disseminate(self.beliefs)
-            #     self.since_decision = 0
+            if (can_switch and self.beliefs.has_sampled_any
+                    and self.since_decision >= max(1, self.decide_every)):
+                want_dissem = self.policy.select_disseminate(self.beliefs)
+                self.since_decision = 0
 
-            # if not self.beliefs.has_sampled_any:
-            #     want_dissem = False
+            if not self.beliefs.has_sampled_any:
+                want_dissem = False
 
-            # if can_switch and want_dissem != self.disseminating:
-            #     self.disseminating = want_dissem
-            #     self.phase_ticks = 0
+            if can_switch and want_dissem != self.disseminating:
+                self.disseminating = want_dissem
+                self.phase_ticks = 0
 
             # # --- communicate ---
             # if self.disseminating and self.opinion >= 0:
