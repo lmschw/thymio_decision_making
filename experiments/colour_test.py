@@ -11,8 +11,6 @@ class ColourTestExperiment:
         self.paused = False
 
     async def run(self):
-        counter = 0
-        max_counter = 10
         while self.running:
 
             if self.paused:
@@ -20,15 +18,19 @@ class ColourTestExperiment:
                 await asyncio.sleep(0.1)
                 continue
 
-            if counter < max_counter/2:
-                await self.robot.drive(50, 50)
-            else:
-                await self.robot.drive(-50, -50)
-
-            counter += 1
-            counter = counter % max_counter
+            await self.robot.drive(50, 50)
 
             reflected = await self.robot.proximity_ground_reflected()
+
+            if self.logger:
+                self.logger.log(
+                    state={"reflected_0": reflected[0], "reflected_1": reflected[1]},
+                    command={}
+                )
+
+            await asyncio.sleep(1)
+
+            await self.robot.drive(-50, -50)
 
             if self.logger:
                 self.logger.log(
