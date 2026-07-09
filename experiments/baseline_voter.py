@@ -1,9 +1,9 @@
 import asyncio
 
 from behaviours.obstacle_avoidance import ObstacleAvoidance
-from behaviours.active_inference.option_ground_sensor import OptionGroundSensor
+from behaviours.decision_making.option_ground_sensor import OptionGroundSensor
 from behaviours.baseline.voter_model import noisy_measure, process_one_neighbor_message
-from behaviours.active_inference.comm_protocol import encode_message, decode_message
+from behaviours.decision_making.comm_protocol import encode_message, decode_message
 
 
 OPINION_COLORS = [
@@ -62,7 +62,7 @@ class BaselineVoterExperiment:
         )
 
         # --- decision-making params ---
-        self.num_options = self.config.get("num_options", 2)
+        self.num_options = self.config.get("num_options", 3)
 
         option_qualities = self.config.get("option_qualities")
         if option_qualities is None:
@@ -81,13 +81,8 @@ class BaselineVoterExperiment:
 
         self.ground_sensor = OptionGroundSensor(
             num_options=self.num_options,
-            ground_max=self.config.get("ground_max", 1023),
-            white_thr=self.config.get("white_thr", 0.95),
-            color_eps=self.config.get("color_eps", 0.06),
-            red_level=self.config.get("red_level", 0.30),
-            green_level=self.config.get("green_level", 0.60),
-            blue_level=self.config.get("blue_level", 0.12),
-            yellow_level=self.config.get("yellow_level", 0.75),
+            option_centers=self.config.get("option_centers", None),
+            allowed_offset=self.config.get("allowed_offset", 50),
         )
 
         # --- opinion state ---

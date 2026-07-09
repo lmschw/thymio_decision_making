@@ -1,10 +1,10 @@
 import asyncio
 
 from behaviours.obstacle_avoidance import ObstacleAvoidance
-from behaviours.colour_recognition import GroundColourSensor
+from behaviours.decision_making.option_ground_sensor import OptionGroundSensor
 from behaviours.active_inference.active_inference_beliefs import ActiveInferenceBeliefs
 from behaviours.active_inference.efe_policy import EFEPolicy
-from behaviours.active_inference.comm_protocol import encode_message, decode_message
+from behaviours.decision_making.comm_protocol import encode_message, decode_message
 
 
 OPINION_COLORS = [
@@ -41,8 +41,7 @@ class ActiveInferenceExperiment:
       num_options, option_qualities,
       efe_gamma, noise_sigma, c_expected, precision_decay, prior_var,
       min_dwell, decide_every,
-      ground_max, white_thr, color_eps,
-      red_level, green_level, blue_level, yellow_level,
+      option_centers, allowed_offset,
       delta, wheel_velocity, turn_steps
     """
 
@@ -65,11 +64,11 @@ class ActiveInferenceExperiment:
         )
 
         # --- decision-making params ---
-        self.num_options = self.config.get("num_options", 2)
+        self.num_options = self.config.get("num_options", 3)
 
-        option_qualities = self.config.get("option_qualities")
+        option_qualities = self.config.get("option_qualities", None)
         if option_qualities is None:
-            option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
+            option_qualities = [1, 2, 3]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
@@ -77,7 +76,11 @@ class ActiveInferenceExperiment:
         self.min_dwell = self.config.get("min_dwell", 30)
         self.decide_every = self.config.get("decide_every", 5)
 
-        self.ground_sensor = GroundColourSensor()
+        self.ground_sensor = OptionGroundSensor(
+            num_options=self.num_options,
+            option_centers=self.config.get("option_centers", None),
+            allowed_offset=self.config.get("allowed_offset", 50),
+        )
 
         self.beliefs = ActiveInferenceBeliefs(
             num_options=self.num_options,
@@ -132,7 +135,7 @@ class ActiveInferenceExperiment:
 
             # --- belief update ---
             if not self.disseminating:
-                opt_idx, _avg_ground = self.ground_sensor.sense_ground_colour(reflected)
+                opt_idx, _avg_ground = self.ground_sensor.detect_option(reflected)
                 sampled = self.beliefs.update_from_ground(opt_idx)
                 if sampled and self.opinion < 0:
                     self.opinion = opt_idx
