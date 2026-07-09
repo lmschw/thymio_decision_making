@@ -10,11 +10,11 @@ class GroundColour(IntEnum):
 
 
 class GroundColourSensor:
-    BLACK_CENTER = 30
-    GREY_CENTER = 520
-    WHITE_CENTER = 900
+    BLACK_CENTER = 51
+    GREY_CENTER = 154
+    WHITE_CENTER = 885
 
-    ALLOWED_COLOUR_OFFSET = 100
+    ALLOWED_COLOUR_OFFSET = 50
 
     async def sense_ground_colour(self, robot):
         reflected = await robot.proximity_ground_reflected()
