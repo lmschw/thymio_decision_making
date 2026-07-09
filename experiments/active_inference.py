@@ -1,7 +1,7 @@
 import asyncio
 
 from behaviours.obstacle_avoidance import ObstacleAvoidance
-from behaviours.active_inference.option_ground_sensor import OptionGroundSensor
+from behaviours.colour_recognition import GroundColourSensor
 from behaviours.active_inference.active_inference_beliefs import ActiveInferenceBeliefs
 from behaviours.active_inference.efe_policy import EFEPolicy
 from behaviours.active_inference.comm_protocol import encode_message, decode_message
@@ -77,16 +77,7 @@ class ActiveInferenceExperiment:
         self.min_dwell = self.config.get("min_dwell", 30)
         self.decide_every = self.config.get("decide_every", 5)
 
-        self.ground_sensor = OptionGroundSensor(
-            num_options=self.num_options,
-            ground_max=self.config.get("ground_max", 1023),
-            white_thr=self.config.get("white_thr", 0.95),
-            color_eps=self.config.get("color_eps", 0.06),
-            red_level=self.config.get("red_level", 0.30),
-            green_level=self.config.get("green_level", 0.60),
-            blue_level=self.config.get("blue_level", 0.12),
-            yellow_level=self.config.get("yellow_level", 0.75),
-        )
+        self.ground_sensor = GroundColourSensor()
 
         self.beliefs = ActiveInferenceBeliefs(
             num_options=self.num_options,
@@ -141,7 +132,7 @@ class ActiveInferenceExperiment:
 
             # --- belief update ---
             if not self.disseminating:
-                opt_idx, _avg_ground = self.ground_sensor.detect_option(reflected)
+                opt_idx, _avg_ground = self.ground_sensor.sense_ground_colour(reflected)
                 sampled = self.beliefs.update_from_ground(opt_idx)
                 if sampled and self.opinion < 0:
                     self.opinion = opt_idx
