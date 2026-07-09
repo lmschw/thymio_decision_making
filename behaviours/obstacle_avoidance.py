@@ -19,7 +19,7 @@ class ObstacleAvoidance:
         # (7 raw values averaged together will basically never reach `delta`,
         # so gating "go straight" on the same threshold made it unreachable).
         self.straight_length_threshold = self.delta / 3
-        )
+        
         # Wider "go straight" cone than the original 10 degrees, which was
         # tight enough that noise alone kept kicking the robot into the
         # correction branch.
