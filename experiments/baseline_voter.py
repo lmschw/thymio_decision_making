@@ -180,7 +180,7 @@ class BaselineVoterExperiment:
                 self.msgs_rx_total += 1
                 other_op, other_q, _other_conf = decode_message(incoming)
                 self.opinion, self.q_est = process_one_neighbor_message(
-                    self.opinion, self.q_est, other_op, other_q,
+                    self.robot, self.opinion, self.q_est, other_op, other_q,
                     k=self.voter_k)
 
             if self.dissem_timer > 0:

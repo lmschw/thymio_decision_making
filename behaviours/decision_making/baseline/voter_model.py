@@ -30,7 +30,7 @@ def noisy_measure(q_true, noise_sigma, rng=None):
     return max(0.0, min(1.0, q_true + rng.gauss(0.0, noise_sigma)))
 
 
-def process_one_neighbor_message(opinion, q_est, neighbor_opinion, neighbor_quality,
+def process_one_neighbor_message(robot, opinion, q_est, neighbor_opinion, neighbor_quality,
                                   k=6.0, rng=None):
     """
     opinion / q_est: this robot's current opinion (-1 if none) and quality
@@ -54,6 +54,7 @@ def process_one_neighbor_message(opinion, q_est, neighbor_opinion, neighbor_qual
 
     p_switch = 1.0 - math.exp(-k * (other_q - q_est))
     if rng.uniform(0.0, 1.0) < p_switch:
+        robot.system_sound(0)
         return neighbor_opinion, other_q
 
     return opinion, q_est
