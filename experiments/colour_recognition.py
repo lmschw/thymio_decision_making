@@ -3,7 +3,6 @@ import math
 
 from behaviours.base_behaviours.option_ground_sensor import OptionGroundSensor
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
-from utils.colour import Colour
 from utils.geometry import SENSOR_ANGLES
 
 class ColourRecognitionExperiment:
@@ -44,11 +43,6 @@ class ColourRecognitionExperiment:
             reflected = await self.robot.proximity_ground_reflected()
 
             colour = self.ground_sensor.detect_option(reflected)
-            colour_enum = Colour(colour)
-            print("colour", colour)
-            print("colour_enum", colour_enum)
-            print("rgb", colour_enum.rgb)
-            self.robot.top_led(colour_enum.rgb)
 
             left, right = self.obstacle_avoidance.step_motion(prox)
 
