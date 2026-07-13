@@ -1,51 +1,34 @@
-from enum import IntEnum
-
-class GroundColour(IntEnum):
-    BLACK = 0
-    GREY = 1
-    WHITE = 2
-
-    GROUND_NEUTRAL = -1
-    GROUND_UNKNOWN = -2
-
+from utils.colour import Colour
 
 class GroundColourSensor:
-    BLACK_CENTER = 51
-    GREY_CENTER = 154
-    WHITE_CENTER = 885
+    def __init__(self, colour_list=[Colour.BLACK, Colour.GREY, Colour.WHITE], allowed_colour_offset=50):
+        self.colour_list = colour_list
+        self.allowed_colour_offset = allowed_colour_offset
 
-    ALLOWED_COLOUR_OFFSET = 50
-
-    def sense_ground_colour(self, reflected) -> GroundColour:
+    def sense_ground_colour(self, reflected) -> Colour:
         left = self._classify(reflected[0])
         right = self._classify(reflected[1])
 
         return self._choose(left, right)
 
-    def _classify(self, value: int) -> GroundColour:
-        centres = {
-            GroundColour.BLACK: self.BLACK_CENTER,
-            GroundColour.GREY: self.GREY_CENTER,
-            GroundColour.WHITE: self.WHITE_CENTER,
-        }
-
-        best_colour = GroundColour.GROUND_UNKNOWN
+    def _classify(self, value: int) -> Colour:
+        best_colour = Colour.GROUND_UNKNOWN
         best_distance = float("inf")
 
-        for colour, centre in centres.items():
-            distance = abs(value - centre)
+        for colour in self.colour_list:
+            distance = abs(value - colour.default_centre)
 
             if distance < best_distance:
                 best_distance = distance
                 best_colour = colour
 
-        if best_distance <= self.ALLOWED_COLOUR_OFFSET:
+        if best_distance <= self.allowed_colour_offset:
             return best_colour
 
-        return GroundColour.GROUND_UNKNOWN
+        return Colour.GROUND_UNKNOWN
 
     @staticmethod
-    def _choose(left: GroundColour, right: GroundColour) -> GroundColour:
+    def _choose(left: Colour, right: Colour) -> Colour:
 
         if left == right:
             return left
@@ -56,4 +39,4 @@ class GroundColourSensor:
         if left <= 0 and right >= 0:
             return right
 
-        return GroundColour.GROUND_UNKNOWN
+        return Colour.GROUND_UNKNOWN
