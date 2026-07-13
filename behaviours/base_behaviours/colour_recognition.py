@@ -1,42 +1,81 @@
-from utils.colour import Colour
+"""
+Ground patch classifier for decision-making options, calibrated to real
+Thymio hardware readings.
 
-class GroundColourSensor:
-    def __init__(self, colour_list=[Colour.BLACK, Colour.GREY, Colour.WHITE], allowed_colour_offset=50):
-        self.colour_list = colour_list
-        self.allowed_colour_offset = allowed_colour_offset
+Same "nearest calibrated centre within an allowed offset" classification
+as GroundColourSensor, generalised to N configurable option centres.
 
-    def sense_ground_colour(self, reflected) -> Colour:
-        left = self._classify(reflected[0])
-        right = self._classify(reflected[1])
+Unlike the earlier version, white is NOT treated as a "background /
+no-option" sentinel here - it's a real decision option like black or
+grey (matching a 3-option best-of-3 over black / grey / white patches).
+UNKNOWN only means "this reading doesn't match any calibrated centre
+closely enough", not "this is the empty floor".
+"""
 
-        return self._choose(left, right)
+UNKNOWN = -1    # reading doesn't match any calibrated centre closely enough
 
-    def _classify(self, value: int) -> Colour:
-        best_colour = Colour.GROUND_UNKNOWN
+
+class OptionGroundSensor:
+
+    ALLOWED_OFFSET = 30
+    ALLOWED_SENSOR_OFFSET = 40
+
+    # Default centres, in index order: option 0, option 1, option 2
+    # (black, grey, white - calibrated hardware values from
+    # GroundColourSensor: BLACK_CENTER=51, GREY_CENTER=154, WHITE_CENTER=885).
+    DEFAULT_OPTION_CENTERS = [51, 154, 890]
+
+    def __init__(self,
+                 num_options=3,
+                 option_centers=None,
+                 allowed_offset=None):
+        self.num_options = num_options
+        self.option_centers = (list(option_centers) if option_centers is not None
+                                else self.DEFAULT_OPTION_CENTERS[:num_options])
+        if len(self.option_centers) != num_options:
+            raise ValueError(
+                "option_centers length must match num_options "
+                f"({len(self.option_centers)} != {num_options})")
+        self.allowed_offset = (allowed_offset if allowed_offset is not None
+                                else self.ALLOWED_OFFSET)
+
+    def _classify(self, value: int) -> int:
+        """
+        Returns the option index (0..num_options-1) whose centre is
+        nearest `value`, or UNKNOWN if nothing is within allowed_offset.
+        """
+        best_key = UNKNOWN
         best_distance = float("inf")
 
-        for colour in self.colour_list:
-            distance = abs(value - colour.default_centre)
-
+        for idx, centre in enumerate(self.option_centers):
+            distance = abs(value - centre)
             if distance < best_distance:
                 best_distance = distance
-                best_colour = colour
+                best_key = idx
 
-        if best_distance <= self.allowed_colour_offset:
-            return best_colour
+        print("best distance", best_distance)
+        print("allowed offset", self.allowed_offset)
 
-        return Colour.GROUND_UNKNOWN
+        if best_distance <= self.allowed_offset:
+            return best_key
 
-    @staticmethod
-    def _choose(left: Colour, right: Colour) -> Colour:
+        return UNKNOWN
 
-        if left == right:
-            return left
+    def detect_option(self, reflected):
+        """
+        reflected: [left_reading, right_reading] raw ADC values from
+        robot.proximity_ground_reflected().
 
-        if left >= 0 and right <= 0:
-            return left
+        Returns (option_index, avg_reading):
+          option_index is -1 only if the two sensors disagree on
+          different options, or the reading matches no centre at all.
+        """
+        avg = 0.5 * ((reflected[0] if len(reflected) > 0 else 0)
+                     + (reflected[1] if len(reflected) > 1 else 0))
+        
+        if abs(reflected[0] - reflected[1]) >= self.ALLOWED_SENSOR_OFFSET:
+            return UNKNOWN, avg
 
-        if left <= 0 and right >= 0:
-            return right
+        colour = self._classify(avg)
 
-        return Colour.GROUND_UNKNOWN
+        return colour, avg
