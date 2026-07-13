@@ -2,8 +2,8 @@ import asyncio
 
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.option_ground_sensor import OptionGroundSensor
-from behaviours.active_inference.active_inference_beliefs import ActiveInferenceBeliefs
-from behaviours.active_inference.efe_policy import EFEPolicy
+from behaviours.decision_making.active_inference.active_inference_beliefs import ActiveInferenceBeliefs
+from behaviours.decision_making.active_inference.efe_policy import EFEPolicy
 from utils.communication import encode_message, decode_message
 
 
