@@ -1,7 +1,7 @@
 import asyncio
 
-from behaviours.obstacle_avoidance import ObstacleAvoidance
-from behaviours.decision_making.option_ground_sensor import OptionGroundSensor
+from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
+from behaviours.base_behaviours.option_ground_sensor import OptionGroundSensor
 from behaviours.baseline.voter_model import noisy_measure, process_one_neighbor_message
 from behaviours.decision_making.comm_protocol import encode_message, decode_message
 

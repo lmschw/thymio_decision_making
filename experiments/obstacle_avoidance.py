@@ -1,7 +1,7 @@
 import asyncio
 import math
 
-from behaviours.obstacle_avoidance import ObstacleAvoidance
+from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 
 class ObstacleAvoidanceExperiment:
 

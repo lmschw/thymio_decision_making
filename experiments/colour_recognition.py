@@ -1,8 +1,8 @@
 import asyncio
 import math
 
-from behaviours.colour_recognition import GroundColourSensor, GroundColour
-from behaviours.obstacle_avoidance import ObstacleAvoidance
+from behaviours.base_behaviours.colour_recognition import GroundColourSensor, GroundColour
+from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 
 class ColourRecognitionExperiment:
 
