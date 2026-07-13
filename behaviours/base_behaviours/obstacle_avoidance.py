@@ -46,94 +46,35 @@ class ObstacleAvoidance:
         # angle), sensor 2 points straight ahead.
         self.sensor_angles = SENSOR_ANGLES
 
+        self.filtered_x = 0.0
+        self.filtered_y = 0.0
+
+        # tuning
+        self.filter_alpha = 0.25
+        self.max_turn = self.wheel_velocity
+        self.emergency_threshold = self.delta * 1.5
+
+        # keep your existing reverse recovery
+        self.reverse_steps = 6
+        self.reversing = 0
+
     def step_motion(self, prox):
-            """
-            Translation of ARGoS StepMotion(), with hysteresis on the steering
-            fallback and a reverse maneuver for corner/stuck recovery.
-            Returns (left_motor, right_motor).
-            """
+        """
+        Continuous obstacle avoidance using a repulsive potential field.
 
-            f_front = max(prox[:5])
-            f_rear = max(prox[5], prox[6])
+        Returns:
+            (left_motor, right_motor)
+        """
 
-            f_left = max(prox[0], prox[1], prox[6])
-            f_right = max(prox[3], prox[4], prox[5])
+        f_front = max(prox[:5])
+        f_rear = max(prox[5], prox[6])
 
-            b_front = f_front > self.delta
-            b_rear = f_rear > self.delta
+        # ---------------------------------------------------------
+        # Recovery mode
+        # ---------------------------------------------------------
+        if self.reversing > 0:
+            self.reversing -= 1
 
-            # ---------------------------------------------------------
-            # Reversing out of a corner
-            # ---------------------------------------------------------
-            if self.reversing > 0:
-                self.reversing -= 1
-                if f_left > f_right:
-                    return -self.wheel_velocity, -self.wheel_velocity // 2
-                else:
-                    return -self.wheel_velocity // 2, -self.wheel_velocity
-
-            # ---------------------------------------------------------
-            # Continue a previously initiated turn
-            # ---------------------------------------------------------
-            if self.turning_left > 0:
-                self.turning_left -= 1
-
-                if f_left > f_right:
-                    return self.wheel_velocity, 0
-                else:
-                    return 0, self.wheel_velocity
-
-            # ---------------------------------------------------------
-            # Obstacle only in front
-            # ---------------------------------------------------------
-            if b_front and not b_rear:
-                self._front_trigger_streak += 1
-
-                if self._front_trigger_streak >= self.stuck_trigger_limit:
-                    # Pivoting hasn't cleared the obstacle after several
-                    # consecutive triggers -> back up before trying again.
-                    self._front_trigger_streak = 0
-                    self.reversing = self.reverse_steps
-                    if f_left > f_right:
-                        return -self.wheel_velocity, -self.wheel_velocity // 2
-                    else:
-                        return -self.wheel_velocity // 2, -self.wheel_velocity
-
-                self.turning_left = self.turn_steps
-
-                if f_left > f_right:
-                    return -self.wheel_velocity, 0
-                else:
-                    return 0, -self.wheel_velocity
-
-            # Front is clear this tick -> reset the stuck counter
-            self._front_trigger_streak = 0
-
-            # ---------------------------------------------------------
-            # Obstacle only in rear
-            # ---------------------------------------------------------
-            if b_rear and not b_front:
-                self.turning_left = self.turn_steps
-
-                if f_left > f_right:
-                    return self.wheel_velocity, 0
-                else:
-                    return 0, self.wheel_velocity
-
-            # ---------------------------------------------------------
-            # Obstacles both front and rear
-            # ---------------------------------------------------------
-            if b_front and b_rear:
-                self.turning_left = self.turn_steps
-
-                if f_left > f_right:
-                    return -self.wheel_velocity, self.wheel_velocity
-                else:
-                    return self.wheel_velocity, -self.wheel_velocity
-
-            # ---------------------------------------------------------
-            # Compute resultant proximity vector
-            # ---------------------------------------------------------
             x = 0.0
             y = 0.0
 
@@ -141,26 +82,76 @@ class ObstacleAvoidance:
                 x += value * math.cos(angle)
                 y += value * math.sin(angle)
 
-            x /= len(prox)
-            y /= len(prox)
-
-            length = math.hypot(x, y)
             angle = math.atan2(y, x)
 
-            # Hysteresis: below the deadzone, keep steering the way we were
-            # steering last tick instead of letting sensor noise flip it.
-            if abs(angle) < self.angle_deadzone:
-                angle = self._last_steer_angle
-            self._last_steer_angle = angle
+            steer = self.max_turn * math.sin(angle)
 
-            if not (-self.straight_range <= angle <= self.straight_range and
-                    length < self.straight_length_threshold):
+            left = -self.wheel_velocity + steer
+            right = -self.wheel_velocity - steer
 
-                if angle < 0:
-                    return self.wheel_velocity, 0
-                else:
-                    return 0, self.wheel_velocity
+            return int(left), int(right)
 
-            # Drive straight
-            self._last_steer_angle = 0.0
+        # ---------------------------------------------------------
+        # Emergency escape
+        # ---------------------------------------------------------
+        if f_front > self.emergency_threshold:
+            self.reversing = self.reverse_steps
+            return -self.wheel_velocity, -self.wheel_velocity
+
+        # ---------------------------------------------------------
+        # Build repulsive vector
+        # ---------------------------------------------------------
+        x = 0.0
+        y = 0.0
+
+        for value, angle in zip(prox, self.sensor_angles):
+            x += value * math.cos(angle)
+            y += value * math.sin(angle)
+
+        x /= len(prox)
+        y /= len(prox)
+
+        # ---------------------------------------------------------
+        # Low-pass filtering
+        # ---------------------------------------------------------
+        a = self.filter_alpha
+
+        self.filtered_x = a * x + (1.0 - a) * self.filtered_x
+        self.filtered_y = a * y + (1.0 - a) * self.filtered_y
+
+        x = self.filtered_x
+        y = self.filtered_y
+
+        # ---------------------------------------------------------
+        # Resultant obstacle vector
+        # ---------------------------------------------------------
+        length = math.hypot(x, y)
+
+        if length < 1e-6:
             return self.wheel_velocity, self.wheel_velocity
+
+        angle = math.atan2(y, x)
+
+        # ---------------------------------------------------------
+        # Convert obstacle vector into steering
+        #
+        # Positive y = obstacle on left
+        # Negative y = obstacle on right
+        # ---------------------------------------------------------
+        avoidance = min(1.0, length / self.delta)
+
+        steer = -math.sin(angle) * avoidance * self.max_turn
+
+        # slow down when obstacles are nearby
+        speed = self.wheel_velocity * (1.0 - 0.7 * avoidance)
+
+        left = speed + steer
+        right = speed - steer
+
+        left = max(-self.wheel_velocity,
+                min(self.wheel_velocity, left))
+
+        right = max(-self.wheel_velocity,
+                    min(self.wheel_velocity, right))
+
+        return int(left), int(right)
