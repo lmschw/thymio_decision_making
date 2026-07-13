@@ -54,7 +54,6 @@ def process_one_neighbor_message(robot, opinion, q_est, neighbor_opinion, neighb
 
     p_switch = 1.0 - math.exp(-k * (other_q - q_est))
     if rng.uniform(0.0, 1.0) < p_switch:
-        robot.system_sound(0)
         return neighbor_opinion, other_q
 
     return opinion, q_est
