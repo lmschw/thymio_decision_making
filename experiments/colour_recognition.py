@@ -45,6 +45,9 @@ class ColourRecognitionExperiment:
 
             colour = self.ground_sensor.detect_option(reflected)
             colour_enum = Colour(colour)
+            print("colour", colour)
+            print("colour_enum", colour_enum)
+            print("rgb", colour_enum.rgb)
             self.robot.top_led(colour_enum.rgb)
 
             left, right = self.obstacle_avoidance.step_motion(prox)
