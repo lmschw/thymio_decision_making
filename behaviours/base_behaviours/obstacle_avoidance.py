@@ -1,13 +1,13 @@
 import math
 
-from utils.geometry import SENSOR_ANGLES_FLIPPED
+from utils.geometry import SENSOR_ANGLES as SENSOR_ANGLES
 
 class ObstacleAvoidance:
 
     def __init__(
         self,
         wheel_velocity=100,
-        delta=1000,
+        delta=800,
         turn_steps=8,
     ):
 
@@ -44,7 +44,7 @@ class ObstacleAvoidance:
         # layout used by f_left/f_right below: sensors 0, 1, 6 are on the
         # left (positive angle), sensors 3, 4, 5 are on the right (negative
         # angle), sensor 2 points straight ahead.
-        self.sensor_angles = SENSOR_ANGLES_FLIPPED
+        self.sensor_angles = SENSOR_ANGLES
 
     def step_motion(self, prox):
             """
