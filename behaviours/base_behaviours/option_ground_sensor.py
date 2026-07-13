@@ -18,11 +18,12 @@ UNKNOWN = -1    # reading doesn't match any calibrated centre closely enough
 class OptionGroundSensor:
 
     ALLOWED_OFFSET = 40
+    ALLOWED_SENSOR_OFFSET = 40
 
     # Default centres, in index order: option 0, option 1, option 2
     # (black, grey, white - calibrated hardware values from
     # GroundColourSensor: BLACK_CENTER=51, GREY_CENTER=154, WHITE_CENTER=885).
-    DEFAULT_OPTION_CENTERS = [51, 154, 900]
+    DEFAULT_OPTION_CENTERS = [51, 154, 885]
 
     def __init__(self,
                  num_options=3,
@@ -60,21 +61,6 @@ class OptionGroundSensor:
 
         return UNKNOWN
 
-    def _choose(self, left: int, right: int) -> int:
-        def is_option(c):
-            return c >= 0
-
-        if left == right:
-            return left
-
-        if is_option(left) and not is_option(right):
-            return left
-
-        if is_option(right) and not is_option(left):
-            return right
-
-        return UNKNOWN
-
     def detect_option(self, reflected):
         """
         reflected: [left_reading, right_reading] raw ADC values from
@@ -84,12 +70,12 @@ class OptionGroundSensor:
           option_index is -1 only if the two sensors disagree on
           different options, or the reading matches no centre at all.
         """
-        left = self._classify(reflected[0]) if len(reflected) > 0 else UNKNOWN
-        right = self._classify(reflected[1]) if len(reflected) > 1 else UNKNOWN
         avg = 0.5 * ((reflected[0] if len(reflected) > 0 else 0)
                      + (reflected[1] if len(reflected) > 1 else 0))
-        print("left", left)
-        print("right", right)
-        print("avg class", self._classify(avg))
+        
+        if abs(reflected[0] - reflected[0]) >= self.ALLOWED_SENSOR_OFFSET:
+            return UNKNOWN, avg
 
-        return self._choose(left, right), avg
+        colour = self._classify(avg)
+
+        return colour, avg
