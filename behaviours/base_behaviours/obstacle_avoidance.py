@@ -43,54 +43,76 @@ class ObstacleAvoidance:
         self.reversing = 0
 
     def step_motion(self, prox):
-        # --------- Sensor groups ---------
-        left = prox[0] + prox[1] + 0.5 * prox[6]
-        right = prox[4] + prox[3] + 0.5 * prox[5]
-        front = prox[1] + 2.0 * prox[2] + prox[3]
+        # ---------- Weighted sensor sums ----------
+        left = (
+            1.8 * prox[0] +
+            1.2 * prox[1] +
+            0.3 * prox[6]
+        )
 
-        # --------- Escape behaviour ---------
+        right = (
+            1.8 * prox[4] +
+            1.2 * prox[3] +
+            0.3 * prox[5]
+        )
+
+        front = (
+            0.7 * prox[1] +
+            2.5 * prox[2] +
+            0.7 * prox[3]
+        )
+
+        # ---------- Escape behaviour ----------
         if self.reversing > 0:
             self.reversing -= 1
 
             if self.turn_bias > 0:
-                return -self.wheel_velocity, 0
+                return -80, 80
             else:
-                return 0, -self.wheel_velocity
+                return 80, -80
 
-        # Robot is completely facing a wall
-        if (
-            prox[2] > self.delta
-            and abs(left - right) < 300
-        ):
-            self.reversing = 8
-            self.turn_bias *= -1          # alternate direction each escape
+        # ---------- Wall directly ahead ----------
+        #
+        # If the centre sensor is high and both sides are roughly equal,
+        # commit to one turn direction.
+        #
+        if front > 1.8 * self.delta and abs(left - right) < 300:
+
+            self.reversing = 6
+
+            # Alternate direction each time so we don't always choose
+            # the wrong side in a corner.
+            self.turn_bias *= -1
 
             if self.turn_bias > 0:
-                return -self.wheel_velocity, 0
+                return -80, 80
             else:
-                return 0, -self.wheel_velocity
+                return 80, -80
 
-        # --------- Continuous avoidance ---------
+        # ---------- Continuous avoidance ----------
 
-        K_SIDE = 0.015
-        K_FRONT = 0.010
+        # Cross-coupling:
+        #
+        # left obstacle -> slow RIGHT wheel
+        # right obstacle -> slow LEFT wheel
+        #
+        K_SIDE = 0.025
+        K_FRONT = 0.015
 
         left_speed = (
-            self.wheel_velocity
-            - K_SIDE * left
-            - K_FRONT * front
-        )
-
-        right_speed = (
             self.wheel_velocity
             - K_SIDE * right
             - K_FRONT * front
         )
 
-        # Never completely stop
-        MIN_SPEED = 25
+        right_speed = (
+            self.wheel_velocity
+            - K_SIDE * left
+            - K_FRONT * front
+        )
 
-        left_speed = max(MIN_SPEED, min(self.wheel_velocity, left_speed))
-        right_speed = max(MIN_SPEED, min(self.wheel_velocity, right_speed))
+        # Never reverse during normal avoidance.
+        left_speed = max(20, min(self.wheel_velocity, left_speed))
+        right_speed = max(20, min(self.wheel_velocity, right_speed))
 
         return int(left_speed), int(right_speed)
