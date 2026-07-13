@@ -52,6 +52,9 @@ class OptionGroundSensor:
                 best_distance = distance
                 best_key = idx
 
+        print("best distance", best_distance)
+        print("allowed offset", self.allowed_offset)
+
         if best_distance <= self.allowed_offset:
             return best_key
 
@@ -85,5 +88,8 @@ class OptionGroundSensor:
         right = self._classify(reflected[1]) if len(reflected) > 1 else UNKNOWN
         avg = 0.5 * ((reflected[0] if len(reflected) > 0 else 0)
                      + (reflected[1] if len(reflected) > 1 else 0))
+        print("left", left)
+        print("right", right)
+        print("avg class", self._classify(avg))
 
         return self._choose(left, right), avg
