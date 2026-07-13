@@ -18,14 +18,12 @@ class ColourRecognitionExperiment:
         # Parameters
         self.delta = self.config.get("delta", 1000)
         self.wheel_velocity = self.config.get("wheel_velocity", 300)
-        self.turn_steps = self.config.get("turn_steps", 8)
 
         self.turning_left = 0
 
         self.ground_sensor = OptionGroundSensor()
         self.obstacle_avoidance = ObstacleAvoidance(wheel_velocity=self.wheel_velocity,
-                                                    delta=self.delta,
-                                                    turn_steps=self.turn_steps)
+                                                    delta=self.delta)
 
         # Approximate Thymio proximity sensor angles (radians)
         self.sensor_angles = SENSOR_ANGLES
