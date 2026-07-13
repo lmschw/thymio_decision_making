@@ -44,7 +44,9 @@ class ColourRecognitionExperiment:
 
             colour = self.ground_sensor.detect_option(reflected)
 
-            left, right = self.obstacle_avoidance.step_motion(prox)
+            #left, right = self.obstacle_avoidance.step_motion(prox)
+            left = -50
+            right = 50
 
             await self.robot.drive(left, right)
 
