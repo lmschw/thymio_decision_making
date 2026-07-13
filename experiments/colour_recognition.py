@@ -1,7 +1,7 @@
 import asyncio
 import math
 
-from behaviours.base_behaviours.colour_recognition import GroundColourSensor
+from behaviours.base_behaviours.option_ground_sensor import OptionGroundSensor
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from utils.geometry import SENSOR_ANGLES
 
@@ -22,7 +22,7 @@ class ColourRecognitionExperiment:
 
         self.turning_left = 0
 
-        self.ground_sensor = GroundColourSensor()
+        self.ground_sensor = OptionGroundSensor()
         self.obstacle_avoidance = ObstacleAvoidance(wheel_velocity=self.wheel_velocity,
                                                     delta=self.delta,
                                                     turn_steps=self.turn_steps)
@@ -42,7 +42,7 @@ class ColourRecognitionExperiment:
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
 
-            colour = self.ground_sensor.sense_ground_colour(reflected)
+            colour = self.ground_sensor.detect_option(reflected)
 
             self.robot.top_led(colour.rgb)
 
