@@ -43,7 +43,7 @@ class ColourRecognitionExperiment:
             colour = self.ground_sensor.detect_option(reflected)
 
             if colour[0] >= 0:
-                await self.robot.system_sound(colour)
+                await self.robot.system_sound(colour[0])
             else:
                 await self.robot.sound_stop()
 
