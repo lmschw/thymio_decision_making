@@ -1,6 +1,6 @@
 import asyncio
 
-from behaviours.weighted_voter_model import WeightedVoterModel
+from behaviours.decision_making.weighted_voter_model import WeightedVoterModel
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 
 class WeightedVoterExperiment:

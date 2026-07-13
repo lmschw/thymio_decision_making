@@ -2,8 +2,8 @@ import asyncio
 
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.option_ground_sensor import OptionGroundSensor
-from behaviours.baseline.voter_model import noisy_measure, process_one_neighbor_message
-from behaviours.decision_making.comm_protocol import encode_message, decode_message
+from behaviours.decision_making.baseline.voter_model import noisy_measure, process_one_neighbor_message
+from utils.communication import encode_message, decode_message
 
 
 OPINION_COLORS = [
