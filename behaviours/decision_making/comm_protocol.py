@@ -21,15 +21,13 @@ CONF_BITS = 6
 QUALITY_MAX = (1 << QUALITY_BITS) - 1  # 63
 CONF_MAX = (1 << CONF_BITS) - 1        # 63
 
-
-def _clamp01(x):
-    return max(0.0, min(1.0, x))
+from utils.utils import clamp01
 
 
 def encode_message(option: int, quality01: float, confidence01: float) -> int:
     op = max(0, min(7, int(option)))
-    q = round(_clamp01(quality01) * QUALITY_MAX)
-    c = round(_clamp01(confidence01) * CONF_MAX)
+    q = round(clamp01(quality01) * QUALITY_MAX)
+    c = round(clamp01(confidence01) * CONF_MAX)
     return (op << (QUALITY_BITS + CONF_BITS)) | (q << CONF_BITS) | c
 
 

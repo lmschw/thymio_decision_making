@@ -1,10 +1,7 @@
 import math
 import random
 
-
-def clamp01(x):
-    return max(0.0, min(1.0, x))
-
+from utils.utils import clamp01
 
 class ActiveInferenceBeliefs:
     """
