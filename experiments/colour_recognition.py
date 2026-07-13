@@ -54,7 +54,7 @@ class ColourRecognitionExperiment:
                            "reflected_0": reflected[0], 
                            "reflected_1": reflected[1],
                            "reflected_avg": (reflected[0] + reflected[1])/2,
-                           "colour": colour},
+                           "colour": colour[0]},
                     command={
                         "left_motor": left,
                         "right_motor": right,
