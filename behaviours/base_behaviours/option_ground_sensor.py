@@ -17,13 +17,13 @@ UNKNOWN = -1    # reading doesn't match any calibrated centre closely enough
 
 class OptionGroundSensor:
 
-    ALLOWED_OFFSET = 40
+    ALLOWED_OFFSET = 30
     ALLOWED_SENSOR_OFFSET = 40
 
     # Default centres, in index order: option 0, option 1, option 2
     # (black, grey, white - calibrated hardware values from
     # GroundColourSensor: BLACK_CENTER=51, GREY_CENTER=154, WHITE_CENTER=885).
-    DEFAULT_OPTION_CENTERS = [51, 154, 885]
+    DEFAULT_OPTION_CENTERS = [51, 154, 890]
 
     def __init__(self,
                  num_options=3,
