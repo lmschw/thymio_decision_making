@@ -1,7 +1,7 @@
 import asyncio
 import math
 
-from behaviours.base_behaviours.colour_recognition import GroundColourSensor, GroundColour
+from behaviours.base_behaviours.colour_recognition import GroundColourSensor
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from utils.geometry import SENSOR_ANGLES
 
@@ -44,17 +44,7 @@ class ColourRecognitionExperiment:
 
             colour = self.ground_sensor.sense_ground_colour(reflected)
 
-            match colour:
-                case GroundColour.BLACK:
-                    await self.robot.top_led(0, 0, 32)
-                case GroundColour.GREY:
-                    await self.robot.top_led(0, 32, 0)
-                case GroundColour.WHITE:
-                    await self.robot.top_led(32, 0, 0)
-                case GroundColour.GROUND_NEUTRAL:
-                    await self.robot.top_led(32, 32, 0)
-                case GroundColour.GROUND_NEUTRAL:
-                    await self.robot.top_led(0, 32, 32)
+            self.robot.top_led(colour.rgb)
 
             left, right = self.obstacle_avoidance.step_motion(prox)
 
