@@ -1,8 +1,5 @@
 import random
 
-from utils.geometry import SENSOR_ANGLES
-
-
 class ObstacleAvoidance:
 
     def __init__(
