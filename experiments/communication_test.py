@@ -133,7 +133,6 @@ class CommunicationTestExperiment:
         await self.robot.top_led(r, g, b)
 
         if self.logger:
-            left, right = 0
             try:
                 self.logger.log(
                     state={
@@ -147,8 +146,6 @@ class CommunicationTestExperiment:
                         "msgs_rx_total": self.msgs_rx_total,
                     },
                     command={
-                        "left_motor": left,
-                        "right_motor": right,
                         "led_r": r, "led_g": g, "led_b": b,
                     },
                 )
