@@ -66,6 +66,10 @@ class CommunicationTestExperiment:
         self.last_explore_bout = 0
         self.last_exploit_bout = 0
 
+        self.other_op = -10
+        self.other_q = -10
+        self._other_conf = -10
+
     async def run(self):
         print("in run")
         while self.running:
