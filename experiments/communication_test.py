@@ -81,6 +81,7 @@ class CommunicationTestExperiment:
 
             try:
                 await self._tick()
+                print("finished tick")
             except Exception as exc:
                 # Never let a single bad tick (e.g. a comms read failing
                 # because no message has arrived yet) kill the loop and
@@ -93,16 +94,19 @@ class CommunicationTestExperiment:
         await self.robot.stop()
 
     async def _tick(self):
+
+        print("start tick")
         self.tick_count += 1
 
-        prox = await self.robot.proximity_horizontal()
         reflected = await self.robot.proximity_ground_reflected()
 
+        print("past reflected")
         # Detected patch, for logging, regardless of phase.
         opt_idx, _avg = self.ground_sensor.detect_option(reflected)
 
         self._update_estimate_from_ground(opt_idx)
 
+        print("past update estimate")
         # --- DISSEMINATE ---
         if self.opinion >= 0:
             # confidence fixed at 1.0: the baseline/voter model doesn't
@@ -124,6 +128,7 @@ class CommunicationTestExperiment:
                 self.robot, self.opinion, self.q_est, other_op, other_q,
                 k=self.voter_k)
 
+        print("past dissemination")
         # --- LEDs: colour = current opinion ---
         if 0 <= self.opinion < len(OPINION_COLORS):
             r, g, b = OPINION_COLORS[self.opinion]
