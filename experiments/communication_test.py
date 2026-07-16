@@ -119,9 +119,9 @@ class CommunicationTestExperiment:
             incoming = None
         if incoming is not None:
             self.msgs_rx_total += 1
-            other_op, other_q, _other_conf = decode_message(incoming)
+            self.other_op, self.other_q, self._other_conf = decode_message(incoming)
             self.opinion, self.q_est = process_one_neighbor_message(
-                self.robot, self.opinion, self.q_est, other_op, other_q,
+                self.robot, self.opinion, self.q_est, self.other_op, self.other_q,
                 k=self.voter_k)
 
         print("past dissemination")
@@ -139,9 +139,9 @@ class CommunicationTestExperiment:
                         "option": self.opinion,
                         "quality": self.q_est,
                         "received": incoming,
-                        "other_op": other_op,
-                        "other_q": other_q,
-                        "other_conf": _other_conf,
+                        "other_op": self.other_op,
+                        "other_q": self.other_q,
+                        "other_conf": self._other_conf,
                         "msgs_tx_total": self.msgs_tx_total,
                         "msgs_rx_total": self.msgs_rx_total,
                     },
