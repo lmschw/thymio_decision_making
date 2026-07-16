@@ -23,11 +23,6 @@ class CommunicationTestExperiment:
         self.running = True
         self.paused = False
 
-        # --- identity, for the shared CSV log ---
-        self.robot_id = self.config.get("robot_id", "")
-        self.env_state = self.config.get("env_state")
-        self.true_best = self.config.get("true_best")
-
         # --- decision-making params ---
         self.num_options = self.config.get("num_options", 3)
 
@@ -72,8 +67,9 @@ class CommunicationTestExperiment:
         self.last_exploit_bout = 0
 
     async def run(self):
+        print("in run")
         while self.running:
-
+            print("is running")
             if self.paused:
                 await self.robot.stop()
                 await asyncio.sleep(0.05)
