@@ -11,5 +11,7 @@ experiments:
     class: experiments.colour_recognition.ColourRecognitionExperiment
   colour_test:
     class: experiments.colour_test.ColourTestExperiment
+  communication_test:
+    class: experiments.communication_test.CommunicationTestExperiment
   obstacle_avoidance:
     class: experiments.obstacle_avoidance.ObstacleAvoidanceExperiment
