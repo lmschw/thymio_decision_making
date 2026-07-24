@@ -38,6 +38,7 @@ class CommunicationTestExperiment:
                                 "received": incoming,
 
                             },
+                            command={},
                         )
                     except Exception as log_exc:
                         # A logging failure must NEVER stop the robot. Print and
