@@ -53,9 +53,6 @@ class OptionGroundSensor:
                 best_distance = distance
                 best_key = idx
 
-        print("best distance", best_distance)
-        print("allowed offset", self.allowed_offset)
-
         if best_distance <= self.allowed_offset:
             return best_key
 

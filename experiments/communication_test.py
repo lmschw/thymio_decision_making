@@ -49,7 +49,7 @@ class CommunicationTestExperiment:
 
         # --- opinion state ---
         self.opinion = -1
-        self.q_est = 0.0
+        self.q_est = 10.0
 
         # --- phase state ---
         self.disseminating = False
@@ -106,7 +106,7 @@ class CommunicationTestExperiment:
 
         self._update_estimate_from_ground(opt_idx)
 
-        print("past update estimate")
+        print("past update estimate", self.q_est)
         # --- DISSEMINATE ---
         if self.opinion >= 0:
             # confidence fixed at 1.0: the baseline/voter model doesn't
