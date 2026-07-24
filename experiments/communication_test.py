@@ -2,7 +2,7 @@ import asyncio
 
 from behaviours.decision_making.baseline.voter_model import noisy_measure, process_one_neighbor_message
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
-from utils.communication import encode_message, decode_message
+from utils.communication import encode_opinion_quality, decode_opinion_quality
 
 
 OPINION_COLORS = [
@@ -103,7 +103,7 @@ class CommunicationTestExperiment:
             # confidence fixed at 1.0: the baseline/voter model doesn't
             # use a confidence-weighted update like the AIF variant does.
             await self.robot.send(
-                encode_message(self.opinion, self.q_est, 1.0))
+                encode_opinion_quality(self.opinion, self.q_est, 1.0))
             self.msgs_tx_total += 1
 
         incoming = None
@@ -115,7 +115,7 @@ class CommunicationTestExperiment:
             incoming = None
         if incoming is not None:
             self.msgs_rx_total += 1
-            self.other_op, self.other_q, self._other_conf = decode_message(incoming)
+            self.other_op, self.other_q, self._other_conf = decode_opinion_quality(incoming)
             self.opinion, self.q_est = process_one_neighbor_message(
                 self.robot, self.opinion, self.q_est, self.other_op, self.other_q,
                 k=self.voter_k)
