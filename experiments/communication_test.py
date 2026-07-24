@@ -23,6 +23,15 @@ class CommunicationTestExperiment:
                 continue
 
             try:
+
+                self.robot.connection.client.process_waiting_messages()
+
+                rx = self.robot.connection.node.var.get("prox.comm.rx")
+                payloads = self.robot.connection.node.var.get("prox.comm.rx._payloads")
+
+                if rx != [0] or any(payloads):
+                    print("[COMM RX]", rx, payloads)
+                    
                 print("value:", self.value)
                 await self.robot.send(self.value)
 
