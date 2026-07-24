@@ -103,7 +103,7 @@ class CommunicationTestExperiment:
             # confidence fixed at 1.0: the baseline/voter model doesn't
             # use a confidence-weighted update like the AIF variant does.
             await self.robot.send(
-                encode_opinion_quality(self.opinion, self.q_est, 1.0))
+                encode_opinion_quality(self.opinion, self.q_est))
             self.msgs_tx_total += 1
 
         incoming = None
