@@ -118,6 +118,7 @@ class CommunicationTestExperiment:
         incoming = None
         try:
             incoming = await self.robot.receive()
+            print("incoming: ", incoming)
         except (TypeError, ValueError):
             # No message present yet - treat as "nothing received".
             incoming = None
