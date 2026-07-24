@@ -31,9 +31,9 @@ def encode_message(option: int, quality01: float, confidence01: float) -> int:
     return (op << (QUALITY_BITS + CONF_BITS)) | (q << CONF_BITS) | c
 
 
-def decode_message(value: int):
+def decode_message(value):
     """Returns (option: int, quality01: float, confidence01: float)."""
-    value = int(value)
+    value = int(value[0])
     op = (value >> (QUALITY_BITS + CONF_BITS)) & 0x7
     q = (value >> CONF_BITS) & QUALITY_MAX
     c = value & CONF_MAX
