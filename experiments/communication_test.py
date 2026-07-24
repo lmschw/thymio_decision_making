@@ -48,8 +48,8 @@ class CommunicationTestExperiment:
         )
 
         # --- opinion state ---
-        self.opinion = -1
-        self.q_est = 10.0
+        self.opinion = 1
+        self.q_est = 8.0
 
         # --- phase state ---
         self.disseminating = False
@@ -98,15 +98,6 @@ class CommunicationTestExperiment:
         print("start tick")
         self.tick_count += 1
 
-        reflected = await self.robot.proximity_ground_reflected()
-
-        print("past reflected")
-        # Detected patch, for logging, regardless of phase.
-        opt_idx, _avg = self.ground_sensor.detect_option(reflected)
-
-        self._update_estimate_from_ground(opt_idx)
-
-        print("past update estimate", self.q_est)
         # --- DISSEMINATE ---
         if self.opinion >= 0:
             # confidence fixed at 1.0: the baseline/voter model doesn't
@@ -160,25 +151,6 @@ class CommunicationTestExperiment:
                 print(f"[BaselineVoterExperiment] logging failed "
                       f"(motors unaffected): {log_exc!r}")
 
-    def _update_estimate_from_ground(self, opt_idx):
-        """
-        Port of UpdateEstimateFromGround: refreshes q_est whenever the
-        robot is on the patch matching its current opinion, or adopts a
-        first opinion if it doesn't have one yet. Returns True if q_est
-        was updated (this return value is deliberately NOT used to trigger
-        the phase switch, matching the ARGoS controller).
-        """
-        if opt_idx < 0 or opt_idx >= len(self.option_qualities):
-            return False
-        q = noisy_measure(self.option_qualities[opt_idx], self.noise_sigma)
-        if self.opinion < 0:
-            self.opinion = opt_idx
-            self.q_est = q
-            return True
-        if opt_idx == self.opinion:
-            self.q_est = q
-            return True
-        return False
 
     async def pause(self):
         self.paused = True
