@@ -55,7 +55,7 @@ class CommunicationTestExperiment:
                 await self.robot.stop()
                 print(f"[CommunicationTestExperiment] tick error, motors stopped: {exc!r}")
 
-            await asyncio.sleep(0.05)
+            await asyncio.sleep(1)
 
         await self.robot.stop()
 
