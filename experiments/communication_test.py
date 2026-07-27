@@ -12,6 +12,7 @@ class CommunicationTestExperiment:
         self.paused = False
 
         self.value = np.random.randint(1,10)
+        self.speed = 30
 
     async def run(self):
         print("in run")
@@ -35,9 +36,20 @@ class CommunicationTestExperiment:
                 print("value:", self.value)
                 await self.robot.send(self.value)
 
-                incoming = await self.robot.receive()
+                incoming, intensities, front_intensity, rear_intensity = await self.robot.receive()
                 print("incoming: ", incoming)
 
+                if  front_intensity > 0:
+                    left = -self.speed
+                    right = -self.speed
+                elif rear_intensity > 0:
+                    left = self.speed
+                    right = self.speed
+                else:
+                    left = 0
+                    right = 0
+
+                await self.robot.drive(left,right)
 
                 if self.logger:
                     try:
@@ -45,9 +57,14 @@ class CommunicationTestExperiment:
                             state={
                                 "value": self.value,
                                 "received": incoming,
-
+                                "intensities": intensities,
+                                "front_intensity": front_intensity,
+                                "rear_intensity": rear_intensity
                             },
-                            command={},
+                            command={
+                                "left_motor": left,
+                                "right_motor": right,
+                            },
                         )
                     except Exception as log_exc:
                         # A logging failure must NEVER stop the robot. Print and
