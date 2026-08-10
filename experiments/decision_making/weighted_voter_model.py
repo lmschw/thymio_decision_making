@@ -49,6 +49,11 @@ class BaselineVoterBaselineExperiment:
     the same quality-reversal environment perturbation as ARGoS's loop
     functions (see behaviours.decision_making.environment.quality_switch)
     - disabled by default (swap_tick=0).
+
+    Optionally, `duration_seconds` stops the robot automatically once that
+    many wall-clock seconds have elapsed since the first tick - unset by
+    default (runs until externally stopped). Set the same value across
+    variants to keep run lengths comparable.
     """
 
     def __init__(self, robot, config=None, logger=None):
@@ -58,6 +63,14 @@ class BaselineVoterBaselineExperiment:
 
         self.running = True
         self.paused = False
+
+        # --- total run duration, for cross-variant comparability - disabled
+        # (run until externally stopped) unless configured. Wall-clock
+        # rather than tick-count, since tick_count is a local unsynchronized
+        # per-robot counter (see the `timestamp` field / _tick()) and
+        # different variants have different per-tick overhead.
+        self.duration_seconds = self.config.get("duration_seconds")
+        self.start_time = None
 
         # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
@@ -151,6 +164,11 @@ class BaselineVoterBaselineExperiment:
         # simulation clock), so post-hoc analysis needs a real timestamp to
         # align ticks across robots rather than trusting raw tick numbers.
         wall_time = time.time()
+        if self.start_time is None:
+            self.start_time = wall_time
+        if (self.duration_seconds is not None
+                and wall_time - self.start_time >= self.duration_seconds):
+            self.running = False
 
         # Apply the quality-reversal schedule (no-op unless swap_tick is
         # configured) and refresh env_state/true_best for this tick - both
