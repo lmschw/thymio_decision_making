@@ -4,6 +4,7 @@ from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
 from behaviours.decision_making.baseline.voter_model import noisy_measure
 from behaviours.decision_making.baseline.majority_model import MajorityVoteTally, process_majority_tally
+from behaviours.decision_making.environment.quality_switch import QualitySwitch
 from utils.communication import encode_opinion_quality, decode_opinion_quality
 
 
@@ -40,6 +41,11 @@ class MajorityVotingBaselineExperiment:
         with the same probabilistic voter-model switch curve.
       - `dissem_timer`, initialised to tau0 + floor(tau_gain * quality),
         counts down to 0, after which the robot returns to exploring.
+
+    Optionally, `swap_tick` / `gradual_reversal_ticks` config keys enable
+    the same quality-reversal environment perturbation as ARGoS's loop
+    functions (see behaviours.decision_making.environment.quality_switch)
+    - disabled by default (swap_tick=0).
     """
 
     def __init__(self, robot, config=None, logger=None):
@@ -52,8 +58,14 @@ class MajorityVotingBaselineExperiment:
 
         # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
-        self.env_state = self.config.get("env_state")
         self.true_best = self.config.get("true_best")
+
+        # --- quality-reversal environment perturbation (off by default) ---
+        self.quality_switch = QualitySwitch(
+            swap_tick=self.config.get("swap_tick", 0),
+            gradual_reversal_ticks=self.config.get("gradual_reversal_ticks", 0),
+        )
+        self.env_state = 0
 
         # --- motion params ---
         self.delta = self.config.get("delta", 1000)
@@ -137,6 +149,11 @@ class MajorityVotingBaselineExperiment:
 
     async def _tick(self):
         self.tick_count += 1
+
+        # Apply the quality-reversal schedule (no-op unless swap_tick is
+        # configured) and refresh env_state for this tick.
+        self.quality_switch.apply(self.tick_count, self.option_qualities)
+        self.env_state = self.quality_switch.env_state(self.tick_count)
 
         prox = await self.robot.proximity_horizontal()
         reflected = await self.robot.proximity_ground_reflected()

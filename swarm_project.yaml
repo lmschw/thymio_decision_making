@@ -7,14 +7,20 @@ experiments:
     class: experiments.decision_making.active_inference.ActiveInferenceBaselineExperiment
   active_inference_noisy:
     class: experiments.decision_making.active_inference_noisy.ActiveInferenceNoisyExperiment
+  active_inference_quality_switch:
+    class: experiments.decision_making.active_inference_quality_switch.ActiveInferenceQualitySwitchExperiment
   weighted_voter_baseline:
     class: experiments.decision_making.weighted_voter_model.BaselineVoterBaselineExperiment
   weighted_voter_noisy:
     class: experiments.decision_making.weighted_voter_model_noisy.BaselineVoterNoisyExperiment
+  weighted_voter_quality_switch:
+    class: experiments.decision_making.weighted_voter_model_quality_switch.BaselineVoterQualitySwitchExperiment
   majority_voting_baseline:
     class: experiments.decision_making.majority_voting.MajorityVotingBaselineExperiment
   majority_voting_noisy:
     class: experiments.decision_making.majority_voting_noisy.MajorityVotingNoisyExperiment
+  majority_voting_quality_switch:
+    class: experiments.decision_making.majority_voting_quality_switch.MajorityVotingQualitySwitchExperiment
   colour_recognition:
     class: experiments.base_components.colour_recognition.ColourRecognitionExperiment
   colour_test:

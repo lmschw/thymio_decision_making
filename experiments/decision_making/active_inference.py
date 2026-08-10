@@ -4,6 +4,7 @@ from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
 from behaviours.decision_making.active_inference.active_inference_beliefs import ActiveInferenceBeliefs
 from behaviours.decision_making.active_inference.efe_policy import EFEPolicy
+from behaviours.decision_making.environment.quality_switch import QualitySwitch
 from utils.communication import encode_message, decode_message
 
 
@@ -50,6 +51,11 @@ class ActiveInferenceBaselineExperiment:
       min_dwell, decide_every,
       option_centers, allowed_offset,
       delta, wheel_velocity, turn_steps
+
+    Optionally, `swap_tick` / `gradual_reversal_ticks` config keys enable
+    the same quality-reversal environment perturbation as ARGoS's loop
+    functions (see behaviours.decision_making.environment.quality_switch)
+    - disabled by default (swap_tick=0).
     """
 
     def __init__(self, robot, config=None, logger=None):
@@ -62,8 +68,14 @@ class ActiveInferenceBaselineExperiment:
 
         # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
-        self.env_state = self.config.get("env_state")     # e.g. pre/post-swap marker, if driven externally
         self.true_best = self.config.get("true_best")      # ground-truth best option index, if known
+
+        # --- quality-reversal environment perturbation (off by default) ---
+        self.quality_switch = QualitySwitch(
+            swap_tick=self.config.get("swap_tick", 0),
+            gradual_reversal_ticks=self.config.get("gradual_reversal_ticks", 0),
+        )
+        self.env_state = 0
 
         # --- motion params ---
         self.delta = self.config.get("delta", 1000)
@@ -146,6 +158,13 @@ class ActiveInferenceBaselineExperiment:
 
     async def _tick(self):
             self.tick_count += 1
+
+            # Apply the quality-reversal schedule (no-op unless swap_tick is
+            # configured) and refresh env_state for this tick. Mutates
+            # option_qualities in place, so self.beliefs (which holds the
+            # same list reference) sees the update too.
+            self.quality_switch.apply(self.tick_count, self.option_qualities)
+            self.env_state = self.quality_switch.env_state(self.tick_count)
 
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
