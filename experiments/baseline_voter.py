@@ -178,7 +178,7 @@ class BaselineVoterExperiment:
             if incoming is not None:
                 msgs_rx_tick = 1
                 self.msgs_rx_total += 1
-                other_op, other_q, _other_conf = decode_opinion_quality(incoming)
+                other_op, other_q = decode_opinion_quality(incoming)
                 self.opinion, self.q_est = process_one_neighbor_message(
                     self.robot, self.opinion, self.q_est, other_op, other_q,
                     k=self.voter_k)
