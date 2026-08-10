@@ -21,6 +21,10 @@ experiments:
     class: experiments.decision_making.majority_voting_noisy.MajorityVotingNoisyExperiment
   majority_voting_quality_switch:
     class: experiments.decision_making.majority_voting_quality_switch.MajorityVotingQualitySwitchExperiment
+  cross_inhibition_baseline:
+    class: experiments.decision_making.cross_inhibition.CrossInhibitionBaselineExperiment
+  cross_inhibition_quality_switch:
+    class: experiments.decision_making.cross_inhibition_quality_switch.CrossInhibitionQualitySwitchExperiment
   colour_recognition:
     class: experiments.base_components.colour_recognition.ColourRecognitionExperiment
   colour_test:
