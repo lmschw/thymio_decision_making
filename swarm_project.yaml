@@ -5,10 +5,16 @@ version: 1.0
 experiments:
   active_inference_baseline:
     class: experiments.decision_making.active_inference.ActiveInferenceBaselineExperiment
+  active_inference_noisy:
+    class: experiments.decision_making.active_inference_noisy.ActiveInferenceNoisyExperiment
   weighted_voter_baseline:
     class: experiments.decision_making.weighted_voter_model.BaselineVoterBaselineExperiment
+  weighted_voter_noisy:
+    class: experiments.decision_making.weighted_voter_model_noisy.BaselineVoterNoisyExperiment
   majority_voting_baseline:
     class: experiments.decision_making.majority_voting.MajorityVotingBaselineExperiment
+  majority_voting_noisy:
+    class: experiments.decision_making.majority_voting_noisy.MajorityVotingNoisyExperiment
   colour_recognition:
     class: experiments.base_components.colour_recognition.ColourRecognitionExperiment
   colour_test:
