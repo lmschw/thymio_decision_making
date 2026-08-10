@@ -6,6 +6,7 @@ from behaviours.decision_making.baseline.voter_model import noisy_measure
 from behaviours.decision_making.baseline.majority_model import MajorityVoteTally, process_majority_tally
 from behaviours.decision_making.environment.quality_switch import QualitySwitch
 from utils.communication import encode_opinion_quality, decode_opinion_quality
+from utils.utils import true_best_option
 
 
 OPINION_COLORS = [
@@ -58,7 +59,8 @@ class MajorityVotingBaselineExperiment:
 
         # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
-        self.true_best = self.config.get("true_best")
+        # recomputed every tick from option_qualities - see _tick()
+        self.true_best = -1
 
         # --- quality-reversal environment perturbation (off by default) ---
         self.quality_switch = QualitySwitch(
@@ -84,6 +86,7 @@ class MajorityVotingBaselineExperiment:
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
+        self.true_best = true_best_option(self.option_qualities)
 
         self.noise_sigma = self.config.get("noise_sigma", 0.05)
         self.voter_k = self.config.get("voter_k", 6.0)
@@ -151,9 +154,13 @@ class MajorityVotingBaselineExperiment:
         self.tick_count += 1
 
         # Apply the quality-reversal schedule (no-op unless swap_tick is
-        # configured) and refresh env_state for this tick.
+        # configured) and refresh env_state/true_best for this tick - both
+        # must track option_qualities live so they stay correct across a
+        # quality-swap, matching GetTrueBestOption() being recomputed fresh
+        # every tick in the ARGoS controller.
         self.quality_switch.apply(self.tick_count, self.option_qualities)
         self.env_state = self.quality_switch.env_state(self.tick_count)
+        self.true_best = true_best_option(self.option_qualities)
 
         prox = await self.robot.proximity_horizontal()
         reflected = await self.robot.proximity_ground_reflected()

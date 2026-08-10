@@ -6,6 +6,7 @@ from behaviours.decision_making.active_inference.active_inference_beliefs import
 from behaviours.decision_making.active_inference.efe_policy import EFEPolicy
 from behaviours.decision_making.environment.quality_switch import QualitySwitch
 from utils.communication import encode_message, decode_message
+from utils.utils import true_best_option
 
 
 OPINION_COLORS = [
@@ -68,7 +69,8 @@ class ActiveInferenceBaselineExperiment:
 
         # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
-        self.true_best = self.config.get("true_best")      # ground-truth best option index, if known
+        # recomputed every tick from option_qualities - see _tick()
+        self.true_best = -1
 
         # --- quality-reversal environment perturbation (off by default) ---
         self.quality_switch = QualitySwitch(
@@ -94,6 +96,7 @@ class ActiveInferenceBaselineExperiment:
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
+        self.true_best = true_best_option(self.option_qualities)
 
         self.min_dwell = self.config.get("min_dwell", 30)
         self.decide_every = self.config.get("decide_every", 5)
@@ -160,11 +163,14 @@ class ActiveInferenceBaselineExperiment:
             self.tick_count += 1
 
             # Apply the quality-reversal schedule (no-op unless swap_tick is
-            # configured) and refresh env_state for this tick. Mutates
-            # option_qualities in place, so self.beliefs (which holds the
-            # same list reference) sees the update too.
+            # configured) and refresh env_state/true_best for this tick.
+            # Mutates option_qualities in place, so self.beliefs (which
+            # holds the same list reference) sees the update too, and
+            # true_best tracks it live, matching GetTrueBestOption() being
+            # recomputed fresh every tick in the ARGoS controller.
             self.quality_switch.apply(self.tick_count, self.option_qualities)
             self.env_state = self.quality_switch.env_state(self.tick_count)
+            self.true_best = true_best_option(self.option_qualities)
 
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
