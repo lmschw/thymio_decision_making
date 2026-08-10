@@ -3,15 +3,17 @@ name: Decision Making Swarm Project
 version: 1.0
 
 experiments:
-  active_inference:
-    class: experiments.active_inference.ActiveInferenceExperiment
-  baseline_voter:
-    class: experiments.baseline_voter.BaselineVoterExperiment
+  active_inference_baseline:
+    class: experiments.decision_making.active_inference.ActiveInferenceBaselineExperiment
+  weighted_voter_baseline:
+    class: experiments.decision_making.weighted_voter_model.BaselineVoterBaselineExperiment
+  majority_voting_baseline:
+    class: experiments.decision_making.majority_voting.MajorityVotingBaselineExperiment
   colour_recognition:
-    class: experiments.colour_recognition.ColourRecognitionExperiment
+    class: experiments.base_components.colour_recognition.ColourRecognitionExperiment
   colour_test:
-    class: experiments.colour_test.ColourTestExperiment
+    class: experiments.base_components.colour_test.ColourTestExperiment
   communication_test:
-    class: experiments.communication_test.CommunicationTestExperiment
+    class: experiments.base_components.communication_test.CommunicationTestExperiment
   obstacle_avoidance:
-    class: experiments.obstacle_avoidance.ObstacleAvoidanceExperiment
+    class: experiments.base_components.obstacle_avoidance.ObstacleAvoidanceExperiment

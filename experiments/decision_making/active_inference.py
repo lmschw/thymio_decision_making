@@ -22,7 +22,7 @@ def _pad(values, length):
     return values + [""] * (length - len(values))
 
 
-class ActiveInferenceExperiment:
+class ActiveInferenceBaselineExperiment:
     """
     Best-of-N collective decision making driven by an Active-Inference
     (Expected Free Energy) explore/disseminate policy.

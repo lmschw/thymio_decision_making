@@ -2,7 +2,8 @@ import asyncio
 
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
-from behaviours.decision_making.baseline.voter_model import noisy_measure, process_one_neighbor_message
+from behaviours.decision_making.baseline.voter_model import noisy_measure
+from behaviours.decision_making.baseline.majority_model import MajorityVoteTally, process_majority_tally
 from utils.communication import encode_opinion_quality, decode_opinion_quality
 
 
@@ -14,33 +15,31 @@ OPINION_COLORS = [
 ]
 
 
-class BaselineVoterExperiment:
+class MajorityVotingBaselineExperiment:
     """
     Best-of-N collective decision making with the "baseline" timer-driven
-    explore/disseminate cycle and voter-model social influence.
+    explore/disseminate cycle and majority-vote social influence.
 
     Port of CThymioBestOfTwo::ControlStep_Baseline
-    (control_variant="baseline", social_model="voter") onto the async Robot
-    API, in the same experiment-class shape as ColourRecognitionExperiment /
-    ActiveInferenceExperiment.
+    (control_variant="baseline", social_model="majority") onto the async
+    Robot API, in the same experiment-class shape as
+    BaselineVoterExperiment / ActiveInferenceExperiment.
 
-    EXPLORE phase (timer-only phase switch):
-      - drive around, sample ground patches, and build a quality estimate
-        for whichever option patch the robot is currently standing on
-      - `expl_timer` counts consecutive ticks the robot has held an
-        opinion; once it reaches `expl_max_ticks` the robot switches to
-        disseminating. The quality estimate itself never triggers the
-        switch - only the timer does (this mirrors the ARGoS controller
-        exactly: UpdateEstimateFromGround()'s return value is ignored for
-        phase-switch purposes).
+    EXPLORE phase: identical to BaselineVoterExperiment - drive around,
+    sample ground patches, build a quality estimate, and switch to
+    disseminating once `expl_timer` reaches `expl_max_ticks`.
 
     DISSEMINATE phase (timer-driven duration, scaled by quality):
       - broadcast (opinion, quality) every tick
-      - listen for one neighbour message per tick and apply the voter
-        model (probabilistic switch toward higher-quality opinions)
+      - the real Thymio's prox.comm link only ever exposes ONE message per
+        tick (unlike ARGoS's range-and-bearing sensor, which sees every
+        neighbour's message every tick), so there is nothing to tally
+        votes over within a single tick. Instead, each tick's message is
+        pushed into a rolling `window_ticks`-tick window (MajorityVoteTally)
+        and the majority opinion currently held in that window is applied
+        with the same probabilistic voter-model switch curve.
       - `dissem_timer`, initialised to tau0 + floor(tau_gain * quality),
-        counts down to 0, after which the robot returns to exploring - so
-        a robot with a higher-quality opinion broadcasts for longer.
+        counts down to 0, after which the robot returns to exploring.
     """
 
     def __init__(self, robot, config=None, logger=None):
@@ -82,6 +81,14 @@ class BaselineVoterExperiment:
         self.tau0 = self.config.get("tau0", 30)
         self.tau_gain = self.config.get("tau_gain", 100)
 
+        # majority-vote window (real-hardware stand-in for ARGoS's
+        # "all messages this tick" tally - see class docstring)
+        self.window_ticks = self.config.get("window_ticks", 20)
+        self.tally = MajorityVoteTally(
+            num_options=self.num_options,
+            window_ticks=self.window_ticks,
+        )
+
         self.ground_sensor = OptionGroundSensor(
             num_options=self.num_options,
             option_centers=self.config.get("option_centers"),
@@ -122,7 +129,7 @@ class BaselineVoterExperiment:
                 # because no message has arrived yet) kill the loop and
                 # leave the last drive() command latched on the motors.
                 await self.robot.stop()
-                print(f"[BaselineVoterExperiment] tick error, motors stopped: {exc!r}")
+                print(f"[MajorityVotingExperiment] tick error, motors stopped: {exc!r}")
 
             await asyncio.sleep(0.05)
 
@@ -162,7 +169,7 @@ class BaselineVoterExperiment:
         else:
             # --- DISSEMINATE ---
             if self.opinion >= 0:
-                # confidence fixed at 1.0: the baseline/voter model doesn't
+                # confidence fixed at 1.0: the baseline social models don't
                 # use a confidence-weighted update like the AIF variant does.
                 await self.robot.send(
                     encode_opinion_quality(self.opinion, self.q_est))
@@ -179,9 +186,9 @@ class BaselineVoterExperiment:
                 msgs_rx_tick = 1
                 self.msgs_rx_total += 1
                 other_op, other_q = decode_opinion_quality(incoming)
-                self.opinion, self.q_est = process_one_neighbor_message(
-                    self.robot, self.opinion, self.q_est, other_op, other_q,
-                    k=self.voter_k)
+                self.tally.add(other_op, other_q)
+                self.opinion, self.q_est = process_majority_tally(
+                    self.opinion, self.q_est, self.tally, k=self.voter_k)
 
             if self.dissem_timer > 0:
                 self.dissem_timer -= 1
@@ -213,7 +220,7 @@ class BaselineVoterExperiment:
                 self.logger.log(
                     state={
                         "tick": self.tick_count,
-                        "ctrl_variant": "baseline",
+                        "ctrl_variant": "majority",
                         "robot_id": self.robot_id,
                         "patch": opt_idx,
                         "q_est": round(self.q_est, 6),
@@ -241,7 +248,7 @@ class BaselineVoterExperiment:
             except Exception as log_exc:
                 # A logging failure must NEVER stop the robot. Print and
                 # move on - motion for this tick already happened above.
-                print(f"[BaselineVoterExperiment] logging failed "
+                print(f"[MajorityVotingExperiment] logging failed "
                       f"(motors unaffected): {log_exc!r}")
 
     def _update_estimate_from_ground(self, opt_idx):
