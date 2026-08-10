@@ -171,7 +171,7 @@ class BaselineVoterExperiment:
 
             incoming = None
             try:
-                incoming = await self.robot.receive()
+                incoming, _, _, _ = await self.robot.receive()
             except (TypeError, ValueError):
                 # No message present yet - treat as "nothing received".
                 incoming = None
