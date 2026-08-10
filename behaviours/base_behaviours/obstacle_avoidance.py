@@ -89,9 +89,9 @@ class ObstacleAvoidance:
             )
 
             if self.turn_direction == "left":
-                return self.wheel_velocity, -self.wheel_velocity
-            else:
                 return -self.wheel_velocity, self.wheel_velocity
+            else:
+                return self.wheel_velocity, -self.wheel_velocity
 
         # --------------------------------------------------
         # Rear obstacle
