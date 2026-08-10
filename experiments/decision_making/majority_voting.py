@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
@@ -152,6 +153,11 @@ class MajorityVotingBaselineExperiment:
 
     async def _tick(self):
         self.tick_count += 1
+        # Wall-clock time, for cross-robot alignment: tick_count is a local,
+        # unsynchronized per-robot counter (unlike ARGoS's single shared
+        # simulation clock), so post-hoc analysis needs a real timestamp to
+        # align ticks across robots rather than trusting raw tick numbers.
+        wall_time = time.time()
 
         # Apply the quality-reversal schedule (no-op unless swap_tick is
         # configured) and refresh env_state/true_best for this tick - both
@@ -244,6 +250,7 @@ class MajorityVotingBaselineExperiment:
                 self.logger.log(
                     state={
                         "tick": self.tick_count,
+                        "timestamp": wall_time,
                         "ctrl_variant": "majority",
                         "robot_id": self.robot_id,
                         "patch": opt_idx,
