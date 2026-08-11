@@ -10,7 +10,7 @@ class BaselineVoterQualitySwitchExperiment(BaselineVoterBaselineExperiment):
     bestofN_dynamic_template.argos (gradual_reversal_ticks=0, abrupt swap).
     """
 
-    DEFAULT_SWAP_TICK = 1200
+    DEFAULT_SWAP_TICK = 600
     DEFAULT_GRADUAL_REVERSAL_TICKS = 0
 
     def __init__(self, robot, config=None, logger=None):
