@@ -319,6 +319,9 @@ class ActiveInferenceBaselineExperiment:
                             "pb_0": pb[0], "pb_1": pb[1], "pb_2": pb[2], "pb_3": pb[3],
                             "true_best": self.true_best,
                             "correct": correct,
+                            "q_0": self.option_qualities[0], 
+                            "q_1": self.option_qualities[1],
+                            "q_2": self.option_qualities[2], 
                         },
                         command={
                             "left_motor": left,
