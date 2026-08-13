@@ -54,10 +54,11 @@ class ActiveInferenceBaselineExperiment:
       option_centers, allowed_offset,
       delta, wheel_velocity, turn_steps
 
-    Optionally, `swap_tick` / `gradual_reversal_ticks` config keys enable
-    the same quality-reversal environment perturbation as ARGoS's loop
-    functions (see behaviours.decision_making.environment.quality_switch)
-    - disabled by default (swap_tick=0).
+    Optionally, `swap_seconds` / `gradual_reversal_seconds` config keys
+    enable the same quality-reversal environment perturbation as ARGoS's
+    loop functions (see behaviours.decision_making.environment.quality_switch)
+    - disabled by default (swap_seconds=0). Wall-clock rather than
+    tick-count, for the same reason as `duration_seconds` below.
 
     Optionally, `duration_seconds` stops the robot automatically once that
     many wall-clock seconds have elapsed since the first tick - unset by
@@ -88,8 +89,8 @@ class ActiveInferenceBaselineExperiment:
 
         # --- quality-reversal environment perturbation (off by default) ---
         self.quality_switch = QualitySwitch(
-            swap_tick=self.config.get("swap_tick", 0),
-            gradual_reversal_ticks=self.config.get("gradual_reversal_ticks", 0),
+            swap_seconds=self.config.get("swap_seconds", 0),
+            gradual_reversal_seconds=self.config.get("gradual_reversal_seconds", 0),
         )
         self.env_state = 0
 
@@ -183,18 +184,19 @@ class ActiveInferenceBaselineExperiment:
             wall_time = time.time()
             if self.start_time is None:
                 self.start_time = wall_time
+            elapsed = wall_time - self.start_time
             if (self.duration_seconds is not None
-                    and wall_time - self.start_time >= self.duration_seconds):
+                    and elapsed >= self.duration_seconds):
                 self.running = False
 
-            # Apply the quality-reversal schedule (no-op unless swap_tick is
-            # configured) and refresh env_state/true_best for this tick.
+            # Apply the quality-reversal schedule (no-op unless swap_seconds
+            # is configured) and refresh env_state/true_best for this tick.
             # Mutates option_qualities in place, so self.beliefs (which
             # holds the same list reference) sees the update too, and
             # true_best tracks it live, matching GetTrueBestOption() being
             # recomputed fresh every tick in the ARGoS controller.
-            self.quality_switch.apply(self.tick_count, self.option_qualities)
-            self.env_state = self.quality_switch.env_state(self.tick_count)
+            self.quality_switch.apply(elapsed, self.option_qualities)
+            self.env_state = self.quality_switch.env_state(elapsed)
             self.true_best = true_best_option(self.option_qualities)
 
             prox = await self.robot.proximity_horizontal()

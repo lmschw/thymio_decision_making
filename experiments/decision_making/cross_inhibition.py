@@ -52,12 +52,14 @@ class CrossInhibitionBaselineExperiment:
     detected from flag transitions directly, the same way the ARGoS loop
     functions do it generically in TrackAndLog().
 
-    Optionally, `swap_tick` / `gradual_reversal_ticks` config keys enable
-    the same quality-reversal environment perturbation as ARGoS's loop
-    functions (see behaviours.decision_making.environment.quality_switch)
-    - disabled by default (swap_tick=0). Note noise_sigma has no effect
-    here (there is nothing in this variant that consumes it, matching
-    ARGoS - cross-inhibition never calls NoisyMeasure).
+    Optionally, `swap_seconds` / `gradual_reversal_seconds` config keys
+    enable the same quality-reversal environment perturbation as ARGoS's
+    loop functions (see behaviours.decision_making.environment.quality_switch)
+    - disabled by default (swap_seconds=0). Wall-clock rather than
+    tick-count, for the same reason as `duration_seconds` below. Note
+    noise_sigma has no effect here (there is nothing in this variant that
+    consumes it, matching ARGoS - cross-inhibition never calls
+    NoisyMeasure).
 
     Optionally, `duration_seconds` stops the robot automatically once that
     many wall-clock seconds have elapsed since the first tick - unset by
@@ -88,8 +90,8 @@ class CrossInhibitionBaselineExperiment:
 
         # --- quality-reversal environment perturbation (off by default) ---
         self.quality_switch = QualitySwitch(
-            swap_tick=self.config.get("swap_tick", 0),
-            gradual_reversal_ticks=self.config.get("gradual_reversal_ticks", 0),
+            swap_seconds=self.config.get("swap_seconds", 0),
+            gradual_reversal_seconds=self.config.get("gradual_reversal_seconds", 0),
         )
         self.env_state = 0
 
@@ -172,14 +174,15 @@ class CrossInhibitionBaselineExperiment:
         wall_time = time.time()
         if self.start_time is None:
             self.start_time = wall_time
+        elapsed = wall_time - self.start_time
         if (self.duration_seconds is not None
-                and wall_time - self.start_time >= self.duration_seconds):
+                and elapsed >= self.duration_seconds):
             self.running = False
 
-        # Apply the quality-reversal schedule (no-op unless swap_tick is
+        # Apply the quality-reversal schedule (no-op unless swap_seconds is
         # configured) and refresh env_state/true_best for this tick.
-        self.quality_switch.apply(self.tick_count, self.option_qualities)
-        self.env_state = self.quality_switch.env_state(self.tick_count)
+        self.quality_switch.apply(elapsed, self.option_qualities)
+        self.env_state = self.quality_switch.env_state(elapsed)
         self.true_best = true_best_option(self.option_qualities)
 
         prox = await self.robot.proximity_horizontal()
