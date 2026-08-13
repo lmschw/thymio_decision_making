@@ -14,7 +14,7 @@ class CrossInhibitionQualitySwitchExperiment(CrossInhibitionBaselineExperiment):
     docstring), so the swap has no effect on robot behaviour itself.
     """
 
-    DEFAULT_SWAP_SECONDS = 60
+    DEFAULT_SWAP_SECONDS = 2 * 60
     DEFAULT_GRADUAL_REVERSAL_SECONDS = 0
 
     def __init__(self, robot, config=None, logger=None):
