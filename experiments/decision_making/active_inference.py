@@ -323,6 +323,7 @@ class ActiveInferenceBaselineExperiment:
                             "option_name_2": opt_names[2], "option_name_3": opt_names[3],
                             "option_quality_0": opt_quals[0], "option_quality_1": opt_quals[1],
                             "option_quality_2": opt_quals[2], "option_quality_3": opt_quals[3],
+                            "reflected_0": reflected[0], "reflected_1": reflected[1],
                         },
                         command={
                             "left_motor": left,
