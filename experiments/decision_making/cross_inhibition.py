@@ -6,7 +6,7 @@ from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
 from behaviours.decision_making.cross_inhibition.cross_inhibition_model import process_neighbor_message
 from behaviours.decision_making.environment.quality_switch import QualitySwitch
 from utils.communication import encode_opinion_quality, decode_opinion_quality
-from utils.utils import true_best_option
+from utils.utils import true_best_option, OPTION_NAMES, pad_to_length
 
 
 OPINION_COLORS = [
@@ -113,6 +113,9 @@ class CrossInhibitionBaselineExperiment:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
         self.true_best = true_best_option(self.option_qualities)
+        # names are fixed (tied to ground-patch colour, not quality) even
+        # if a quality-switch later swaps qualities between option indices
+        self.option_names = OPTION_NAMES[:self.num_options]
 
         self.kappa_recruit = self.config.get("kappa_recruit", 0.4)
         self.kappa_inhib = self.config.get("kappa_inhib", 1.0)
@@ -253,6 +256,8 @@ class CrossInhibitionBaselineExperiment:
         if self.logger:
             correct = ("" if self.true_best is None
                        else int(self.opinion == self.true_best))
+            opt_names = pad_to_length(self.option_names, 4)
+            opt_quals = pad_to_length(self.option_qualities, 4)
             try:
                 self.logger.log(
                     state={
@@ -276,6 +281,10 @@ class CrossInhibitionBaselineExperiment:
                         "env_state": self.env_state,
                         "true_best": self.true_best,
                         "correct": correct,
+                        "option_name_0": opt_names[0], "option_name_1": opt_names[1],
+                        "option_name_2": opt_names[2], "option_name_3": opt_names[3],
+                        "option_quality_0": opt_quals[0], "option_quality_1": opt_quals[1],
+                        "option_quality_2": opt_quals[2], "option_quality_3": opt_quals[3],
                     },
                     command={
                         "left_motor": left,

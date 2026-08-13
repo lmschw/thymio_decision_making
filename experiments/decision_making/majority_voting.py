@@ -7,7 +7,7 @@ from behaviours.decision_making.baseline.voter_model import noisy_measure
 from behaviours.decision_making.baseline.majority_model import MajorityVoteTally, process_majority_tally
 from behaviours.decision_making.environment.quality_switch import QualitySwitch
 from utils.communication import encode_opinion_quality, decode_opinion_quality
-from utils.utils import true_best_option
+from utils.utils import true_best_option, OPTION_NAMES, pad_to_length
 
 
 OPINION_COLORS = [
@@ -102,6 +102,9 @@ class MajorityVotingBaselineExperiment:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
         self.true_best = true_best_option(self.option_qualities)
+        # names are fixed (tied to ground-patch colour, not quality) even
+        # if a quality-switch later swaps qualities between option indices
+        self.option_names = OPTION_NAMES[:self.num_options]
 
         self.noise_sigma = self.config.get("noise_sigma", 0.05)
         self.voter_k = self.config.get("voter_k", 6.0)
@@ -266,6 +269,8 @@ class MajorityVotingBaselineExperiment:
         if self.logger:
             correct = ("" if self.true_best is None
                        else int(self.opinion == self.true_best))
+            opt_names = pad_to_length(self.option_names, 4)
+            opt_quals = pad_to_length(self.option_qualities, 4)
             try:
                 self.logger.log(
                     state={
@@ -289,6 +294,10 @@ class MajorityVotingBaselineExperiment:
                         "env_state": self.env_state,
                         "true_best": self.true_best,
                         "correct": correct,
+                        "option_name_0": opt_names[0], "option_name_1": opt_names[1],
+                        "option_name_2": opt_names[2], "option_name_3": opt_names[3],
+                        "option_quality_0": opt_quals[0], "option_quality_1": opt_quals[1],
+                        "option_quality_2": opt_quals[2], "option_quality_3": opt_quals[3],
                     },
                     command={
                         "left_motor": left,
