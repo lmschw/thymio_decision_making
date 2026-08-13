@@ -10,7 +10,7 @@ class ActiveInferenceQualitySwitchExperiment(ActiveInferenceBaselineExperiment):
     swapping around the midpoint; gradual_reversal_seconds=0, abrupt swap).
     """
 
-    DEFAULT_SWAP_SECONDS = 2 * 60
+    DEFAULT_SWAP_SECONDS = 5 * 60
     DEFAULT_GRADUAL_REVERSAL_SECONDS = 0
 
     def __init__(self, robot, config=None, logger=None):
