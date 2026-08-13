@@ -1,5 +1,6 @@
 import asyncio
 import time
+import numpy as np
 
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
@@ -293,3 +294,13 @@ class CrossInhibitionBaselineExperiment:
 
     async def stop(self):
         self.running = False
+
+    async def internal_update(self, update_type):
+        if update_type == "swap":
+            i_min = np.argmin(self.option_qualities)
+            i_max = np.argmax(self.option_qualities)
+            v_max = self.option_qualities[i_max]
+            self.option_qualities[i_max] = self.option_qualities[i_min]
+            self.option_qualities[i_min] = v_max
+            print("option_quality", self.option_qualities)
+
