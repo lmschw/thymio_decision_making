@@ -5,7 +5,6 @@ import numpy as np
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
 from behaviours.decision_making.baseline.voter_model import noisy_measure, process_one_neighbor_message
-from behaviours.decision_making.environment.quality_switch import QualitySwitch
 from utils.communication import encode_opinion_quality, decode_opinion_quality
 from utils.utils import true_best_option
 
@@ -46,15 +45,14 @@ class BaselineVoterBaselineExperiment:
         counts down to 0, after which the robot returns to exploring - so
         a robot with a higher-quality opinion broadcasts for longer.
 
-    Optionally, `swap_tick` / `gradual_reversal_ticks` config keys enable
-    the same quality-reversal environment perturbation as ARGoS's loop
-    functions (see behaviours.decision_making.environment.quality_switch)
-    - disabled by default (swap_tick=0).
-
-    Optionally, `duration_ticks` stops the robot automatically once that
-    many wall-clock seconds have elapsed since the first tick - unset by
-    default (runs until externally stopped). Set the same value across
-    variants to keep run lengths comparable.
+    A quality swap is triggered live, at any moment, by calling
+    internal_update("swap") - this swaps the qualities of whichever two
+    options currently hold the lowest and highest quality. It's driven by
+    an external controller (e.g. decision_external_repo.py's
+    send_swap_command), not scheduled internally: this class has no
+    tick-based swap schedule or duration cutoff of its own - both the
+    swap timing and the overall run length are controlled from outside
+    (via internal_update and an explicit stop()).
     """
 
     def __init__(self, robot, config=None, logger=None):
@@ -65,23 +63,14 @@ class BaselineVoterBaselineExperiment:
         self.running = True
         self.paused = False
 
-        # --- total run duration, for cross-variant comparability - disabled
-        # (run until externally stopped) unless configured. Wall-clock
-        # rather than tick-count, since tick_count is a local unsynchronized
-        # per-robot counter (see the `timestamp` field / _tick()) and
-        # different variants have different per-tick overhead.
-        self.duration_ticks = self.config.get("duration_ticks")
-
         # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
         # recomputed every tick from option_qualities - see _tick()
         self.true_best = -1
 
-        # --- quality-reversal environment perturbation (off by default) ---
-        self.quality_switch = QualitySwitch(
-            swap_tick=self.config.get("swap_tick", 0),
-            gradual_reversal_ticks=self.config.get("gradual_reversal_ticks", 0),
-        )
+        # env_state: 0 = no quality swap yet, 2 = swapped. Set by
+        # internal_update("swap") - swaps are instantaneous and
+        # externally triggered, there is no scheduled/gradual transition.
         self.env_state = 0
 
         # --- motion params ---
@@ -166,17 +155,10 @@ class BaselineVoterBaselineExperiment:
         # align ticks across robots rather than trusting raw tick numbers.
         wall_time = time.time()
 
-        if (self.duration_ticks is not None
-                and self.tick_count >= self.duration_ticks):
-            self.running = False
-
-        # Apply the quality-reversal schedule (no-op unless swap_tick is
-        # configured) and refresh env_state/true_best for this tick - both
-        # must track option_qualities live so they stay correct across a
-        # quality-swap, matching GetTrueBestOption() being recomputed fresh
-        # every tick in the ARGoS controller.
-        self.quality_switch.apply(self.tick_count, self.option_qualities)
-        self.env_state = self.quality_switch.env_state(self.tick_count)
+        # option_qualities can change at any moment via internal_update
+        # ("swap"), so true_best must be recomputed live every tick,
+        # matching GetTrueBestOption() being recomputed fresh every tick
+        # in the ARGoS controller.
         self.true_best = true_best_option(self.option_qualities)
 
         prox = await self.robot.proximity_horizontal()
@@ -323,11 +305,24 @@ class BaselineVoterBaselineExperiment:
         self.running = False
 
     async def internal_update(self, update_type):
+        """
+        Live, externally-triggered environment update - the sole way a
+        quality swap happens now (no internal scheduling or duration
+        cutoff exists in this class; both are controlled from outside).
+
+        update_type="swap": swaps the qualities of whichever two options
+        currently hold the lowest and highest quality (not fixed to
+        options 0/1), and marks env_state as post-change (2). Meant to be
+        invoked on demand by an external controller (e.g. via a
+        session-level command), independent of this robot's own
+        tick_count.
+        """
         if update_type == "swap":
             i_min = np.argmin(self.option_qualities)
             i_max = np.argmax(self.option_qualities)
             v_max = self.option_qualities[i_max]
             self.option_qualities[i_max] = self.option_qualities[i_min]
             self.option_qualities[i_min] = v_max
+            self.env_state = 2
             print("option_quality", self.option_qualities)
 
