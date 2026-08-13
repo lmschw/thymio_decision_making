@@ -7,7 +7,7 @@ from behaviours.decision_making.active_inference.active_inference_beliefs import
 from behaviours.decision_making.active_inference.efe_policy import EFEPolicy
 from behaviours.decision_making.environment.quality_switch import QualitySwitch
 from utils.communication import encode_message, decode_message
-from utils.utils import true_best_option, OPTION_NAMES, pad_to_length
+from utils.utils import true_best_option
 
 
 OPINION_COLORS = [
@@ -16,6 +16,13 @@ OPINION_COLORS = [
     (0, 0, 32),   # option 2 -> blue
     (32, 32, 0),  # option 3 -> yellow
 ]
+
+
+def _pad(values, length):
+    """Right-pads a list with "" so mu_0..3/tau_0..3/pb_0..3 always have
+    a value to log even when num_options < 4."""
+    values = list(values)[:length]
+    return values + [""] * (length - len(values))
 
 
 class ActiveInferenceBaselineExperiment:
@@ -47,13 +54,12 @@ class ActiveInferenceBaselineExperiment:
       option_centers, allowed_offset,
       delta, wheel_velocity, turn_steps
 
-    Optionally, `swap_seconds` / `gradual_reversal_seconds` config keys
-    enable the same quality-reversal environment perturbation as ARGoS's
-    loop functions (see behaviours.decision_making.environment.quality_switch)
-    - disabled by default (swap_seconds=0). Wall-clock rather than
-    tick-count, for the same reason as `duration_seconds` below.
+    Optionally, `swap_tick` / `gradual_reversal_ticks` config keys enable
+    the same quality-reversal environment perturbation as ARGoS's loop
+    functions (see behaviours.decision_making.environment.quality_switch)
+    - disabled by default (swap_tick=0).
 
-    Optionally, `duration_seconds` stops the robot automatically once that
+    Optionally, `duration_ticks` stops the robot automatically once that
     many wall-clock seconds have elapsed since the first tick - unset by
     default (runs until externally stopped). Set the same value across
     variants to keep run lengths comparable.
@@ -72,8 +78,7 @@ class ActiveInferenceBaselineExperiment:
         # rather than tick-count, since tick_count is a local unsynchronized
         # per-robot counter (see the `timestamp` field / _tick()) and
         # different variants have different per-tick overhead.
-        self.duration_seconds = self.config.get("duration_seconds")
-        self.start_time = None
+        self.duration_ticks = self.config.get("duration_ticks")
 
         # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
@@ -82,8 +87,8 @@ class ActiveInferenceBaselineExperiment:
 
         # --- quality-reversal environment perturbation (off by default) ---
         self.quality_switch = QualitySwitch(
-            swap_seconds=self.config.get("swap_seconds", 0),
-            gradual_reversal_seconds=self.config.get("gradual_reversal_seconds", 0),
+            swap_tick=self.config.get("swap_tick", 0),
+            gradual_reversal_ticks=self.config.get("gradual_reversal_ticks", 0),
         )
         self.env_state = 0
 
@@ -106,9 +111,6 @@ class ActiveInferenceBaselineExperiment:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
         self.true_best = true_best_option(self.option_qualities)
-        # names are fixed (tied to ground-patch colour, not quality) even
-        # if a quality-switch later swaps qualities between option indices
-        self.option_names = OPTION_NAMES[:self.num_options]
 
         self.min_dwell = self.config.get("min_dwell", 30)
         self.decide_every = self.config.get("decide_every", 5)
@@ -179,21 +181,19 @@ class ActiveInferenceBaselineExperiment:
             # timestamp to align ticks across robots rather than trusting
             # raw tick numbers.
             wall_time = time.time()
-            if self.start_time is None:
-                self.start_time = wall_time
-            elapsed = wall_time - self.start_time
-            if (self.duration_seconds is not None
-                    and elapsed >= self.duration_seconds):
+
+            if (self.duration_ticks is not None
+                    and self.tick_count >= self.duration_ticks):
                 self.running = False
 
-            # Apply the quality-reversal schedule (no-op unless swap_seconds
-            # is configured) and refresh env_state/true_best for this tick.
+            # Apply the quality-reversal schedule (no-op unless swap_tick is
+            # configured) and refresh env_state/true_best for this tick.
             # Mutates option_qualities in place, so self.beliefs (which
             # holds the same list reference) sees the update too, and
             # true_best tracks it live, matching GetTrueBestOption() being
             # recomputed fresh every tick in the ARGoS controller.
-            self.quality_switch.apply(elapsed, self.option_qualities)
-            self.env_state = self.quality_switch.env_state(elapsed)
+            self.quality_switch.apply(self.tick_count, self.option_qualities)
+            self.env_state = self.quality_switch.env_state(self.tick_count)
             self.true_best = true_best_option(self.option_qualities)
 
             prox = await self.robot.proximity_horizontal()
@@ -278,11 +278,9 @@ class ActiveInferenceBaselineExperiment:
             await self.robot.top_led(r, g, b)
 
             if self.logger:
-                mu = pad_to_length(self.beliefs.mu_q, 4)
-                tau = pad_to_length(self.beliefs.tau_q, 4)
-                pb = pad_to_length(self.beliefs.belief_best, 4)
-                opt_names = pad_to_length(self.option_names, 4)
-                opt_quals = pad_to_length(self.option_qualities, 4)
+                mu = _pad(self.beliefs.mu_q, 4)
+                tau = _pad(self.beliefs.tau_q, 4)
+                pb = _pad(self.beliefs.belief_best, 4)
                 correct = ("" if self.true_best is None
                            else int(self.opinion == self.true_best))
                 try:
@@ -320,11 +318,9 @@ class ActiveInferenceBaselineExperiment:
                             "pb_0": pb[0], "pb_1": pb[1], "pb_2": pb[2], "pb_3": pb[3],
                             "true_best": self.true_best,
                             "correct": correct,
-                            "option_name_0": opt_names[0], "option_name_1": opt_names[1],
-                            "option_name_2": opt_names[2], "option_name_3": opt_names[3],
-                            "option_quality_0": opt_quals[0], "option_quality_1": opt_quals[1],
-                            "option_quality_2": opt_quals[2], "option_quality_3": opt_quals[3],
-                            "reflected_0": reflected[0], "reflected_1": reflected[1],
+                            "q_0": self.option_qualities[0], 
+                            "q_1": self.option_qualities[1],
+                            "q_2": self.option_qualities[2], 
                         },
                         command={
                             "left_motor": left,

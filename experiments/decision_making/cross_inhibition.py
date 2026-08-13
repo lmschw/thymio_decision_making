@@ -6,7 +6,7 @@ from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
 from behaviours.decision_making.cross_inhibition.cross_inhibition_model import process_neighbor_message
 from behaviours.decision_making.environment.quality_switch import QualitySwitch
 from utils.communication import encode_opinion_quality, decode_opinion_quality
-from utils.utils import true_best_option, OPTION_NAMES, pad_to_length
+from utils.utils import true_best_option
 
 
 OPINION_COLORS = [
@@ -52,16 +52,14 @@ class CrossInhibitionBaselineExperiment:
     detected from flag transitions directly, the same way the ARGoS loop
     functions do it generically in TrackAndLog().
 
-    Optionally, `swap_seconds` / `gradual_reversal_seconds` config keys
-    enable the same quality-reversal environment perturbation as ARGoS's
-    loop functions (see behaviours.decision_making.environment.quality_switch)
-    - disabled by default (swap_seconds=0). Wall-clock rather than
-    tick-count, for the same reason as `duration_seconds` below. Note
-    noise_sigma has no effect here (there is nothing in this variant that
-    consumes it, matching ARGoS - cross-inhibition never calls
-    NoisyMeasure).
+    Optionally, `swap_tick` / `gradual_reversal_ticks` config keys enable
+    the same quality-reversal environment perturbation as ARGoS's loop
+    functions (see behaviours.decision_making.environment.quality_switch)
+    - disabled by default (swap_tick=0). Note noise_sigma has no effect
+    here (there is nothing in this variant that consumes it, matching
+    ARGoS - cross-inhibition never calls NoisyMeasure).
 
-    Optionally, `duration_seconds` stops the robot automatically once that
+    Optionally, `duration_ticks` stops the robot automatically once that
     many wall-clock seconds have elapsed since the first tick - unset by
     default (runs until externally stopped). Set the same value across
     variants to keep run lengths comparable.
@@ -80,8 +78,7 @@ class CrossInhibitionBaselineExperiment:
         # rather than tick-count, since tick_count is a local unsynchronized
         # per-robot counter (see the `timestamp` field / _tick()) and
         # different variants have different per-tick overhead.
-        self.duration_seconds = self.config.get("duration_seconds")
-        self.start_time = None
+        self.duration_ticks = self.config.get("duration_ticks")
 
         # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
@@ -90,8 +87,8 @@ class CrossInhibitionBaselineExperiment:
 
         # --- quality-reversal environment perturbation (off by default) ---
         self.quality_switch = QualitySwitch(
-            swap_seconds=self.config.get("swap_seconds", 0),
-            gradual_reversal_seconds=self.config.get("gradual_reversal_seconds", 0),
+            swap_tick=self.config.get("swap_tick", 0),
+            gradual_reversal_ticks=self.config.get("gradual_reversal_ticks", 0),
         )
         self.env_state = 0
 
@@ -108,14 +105,12 @@ class CrossInhibitionBaselineExperiment:
 
         option_qualities = self.config.get("option_qualities")
         if option_qualities is None:
-            option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
+            #option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
+            option_qualities = [0.8, 0.6, 0.3]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
         self.true_best = true_best_option(self.option_qualities)
-        # names are fixed (tied to ground-patch colour, not quality) even
-        # if a quality-switch later swaps qualities between option indices
-        self.option_names = OPTION_NAMES[:self.num_options]
 
         self.kappa_recruit = self.config.get("kappa_recruit", 0.4)
         self.kappa_inhib = self.config.get("kappa_inhib", 1.0)
@@ -175,17 +170,15 @@ class CrossInhibitionBaselineExperiment:
         # simulation clock), so post-hoc analysis needs a real timestamp to
         # align ticks across robots rather than trusting raw tick numbers.
         wall_time = time.time()
-        if self.start_time is None:
-            self.start_time = wall_time
-        elapsed = wall_time - self.start_time
-        if (self.duration_seconds is not None
-                and elapsed >= self.duration_seconds):
+
+        if (self.duration_ticks is not None
+                and self.tick_count >= self.duration_ticks):
             self.running = False
 
-        # Apply the quality-reversal schedule (no-op unless swap_seconds is
+        # Apply the quality-reversal schedule (no-op unless swap_tick is
         # configured) and refresh env_state/true_best for this tick.
-        self.quality_switch.apply(elapsed, self.option_qualities)
-        self.env_state = self.quality_switch.env_state(elapsed)
+        self.quality_switch.apply(self.tick_count, self.option_qualities)
+        self.env_state = self.quality_switch.env_state(self.tick_count)
         self.true_best = true_best_option(self.option_qualities)
 
         prox = await self.robot.proximity_horizontal()
@@ -256,8 +249,6 @@ class CrossInhibitionBaselineExperiment:
         if self.logger:
             correct = ("" if self.true_best is None
                        else int(self.opinion == self.true_best))
-            opt_names = pad_to_length(self.option_names, 4)
-            opt_quals = pad_to_length(self.option_qualities, 4)
             try:
                 self.logger.log(
                     state={
@@ -281,10 +272,6 @@ class CrossInhibitionBaselineExperiment:
                         "env_state": self.env_state,
                         "true_best": self.true_best,
                         "correct": correct,
-                        "option_name_0": opt_names[0], "option_name_1": opt_names[1],
-                        "option_name_2": opt_names[2], "option_name_3": opt_names[3],
-                        "option_quality_0": opt_quals[0], "option_quality_1": opt_quals[1],
-                        "option_quality_2": opt_quals[2], "option_quality_3": opt_quals[3],
                     },
                     command={
                         "left_motor": left,
