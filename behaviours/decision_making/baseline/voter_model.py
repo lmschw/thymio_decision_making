@@ -26,7 +26,7 @@ def noisy_measure(q_true, noise_sigma, rng=None):
     """Adds Gaussian noise when noise_sigma > 0 (noiseless otherwise)."""
     if noise_sigma <= 0.0:
         return max(0.0, min(1.0, q_true))
-    return q_true + random.gauss(0.0, noise_sigma)
+    return max(0.0, min(1.0, q_true + random.gauss(0.0, noise_sigma)))
 
 
 def process_one_neighbor_message(robot, opinion, q_est, neighbor_opinion, neighbor_quality,
