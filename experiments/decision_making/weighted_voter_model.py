@@ -87,7 +87,7 @@ class BaselineVoterBaselineExperiment:
         option_qualities = self.config.get("option_qualities")
         if option_qualities is None:
             #option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
-            option_qualities = [0.8, 0.6, 0.4]
+            option_qualities = [0.8, 0.6, 0.3]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
@@ -149,6 +149,9 @@ class BaselineVoterBaselineExperiment:
 
     async def _tick(self):
         self.tick_count += 1
+        self.sample_generated = 0
+        self.sampled_patch = -1
+        self.sampled_quality = None
         # Wall-clock time, for cross-robot alignment: tick_count is a local,
         # unsynchronized per-robot counter (unlike ARGoS's single shared
         # simulation clock), so post-hoc analysis needs a real timestamp to
@@ -262,6 +265,9 @@ class BaselineVoterBaselineExperiment:
                         "env_state": self.env_state,
                         "true_best": self.true_best,
                         "correct": correct,
+                        "sample_generated": self.sample_generated,
+                        "sampled_patch": self.sampled_patch,
+                        "sampled_quality": round(self.sampled_quality, 6) if self.sampled_quality is not None else ""
                     },
                     command={
                         "left_motor": left,
@@ -286,6 +292,9 @@ class BaselineVoterBaselineExperiment:
         if opt_idx < 0 or opt_idx >= len(self.option_qualities):
             return False
         q = noisy_measure(self.option_qualities[opt_idx], self.noise_sigma)
+        self.sample_generated = 1
+        self.sampled_patch = opt_idx
+        self.sampled_quality = q
         if self.opinion < 0:
             self.opinion = opt_idx
             self.q_est = q
