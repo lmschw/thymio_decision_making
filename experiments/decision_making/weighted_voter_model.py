@@ -126,6 +126,10 @@ class BaselineVoterBaselineExperiment:
         self.last_explore_bout = 0
         self.last_exploit_bout = 0
 
+        self.previous_patch = -1
+        self.visit_sample = None
+        self.visit_sample_patch = -1
+
     async def run(self):
         while self.running:
 
@@ -208,13 +212,13 @@ class BaselineVoterBaselineExperiment:
             except (TypeError, ValueError):
                 # No message present yet - treat as "nothing received".
                 incoming = None
-            if incoming is not None:
-                msgs_rx_tick = 1
-                self.msgs_rx_total += 1
-                other_op, other_q = decode_opinion_quality(incoming)
-                self.opinion, self.q_est = process_one_neighbor_message(
-                    self.robot, self.opinion, self.q_est, other_op, other_q,
-                    k=self.voter_k)
+            # if incoming is not None:
+            #     msgs_rx_tick = 1
+            #     self.msgs_rx_total += 1
+            #     other_op, other_q = decode_opinion_quality(incoming)
+            #     self.opinion, self.q_est = process_one_neighbor_message(
+            #         self.robot, self.opinion, self.q_est, other_op, other_q,
+            #         k=self.voter_k)
 
             if self.dissem_timer > 0:
                 self.dissem_timer -= 1
@@ -238,6 +242,23 @@ class BaselineVoterBaselineExperiment:
         else:
             r, g, b = (0, 0, 0)
         await self.robot.top_led(r, g, b)
+
+        self.visit_sample = None
+        self.visit_sample_patch = -1
+
+        entered_patch = (
+            opt_idx >= 0 and
+            opt_idx != self.previous_patch
+        )
+
+        if entered_patch:
+            self.visit_sample_patch = opt_idx
+            self.visit_sample = noisy_measure(
+                self.option_qualities[opt_idx],
+                self.noise_sigma
+            )
+
+        self.previous_patch = opt_idx
 
         if self.logger:
             correct = ("" if self.true_best is None
@@ -267,7 +288,13 @@ class BaselineVoterBaselineExperiment:
                         "correct": correct,
                         "sample_generated": self.sample_generated,
                         "sampled_patch": self.sampled_patch,
-                        "sampled_quality": round(self.sampled_quality, 6) if self.sampled_quality is not None else ""
+                        "sampled_quality": round(self.sampled_quality, 6) if self.sampled_quality is not None else "",
+                        "visit_sample_patch": self.visit_sample_patch,
+                        "visit_sample": (
+                            round(self.visit_sample, 6)
+                            if self.visit_sample is not None
+                            else ""
+                        ),
                     },
                     command={
                         "left_motor": left,
