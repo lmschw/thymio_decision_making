@@ -194,6 +194,7 @@ class ActiveInferenceBaselineExperiment:
                 if sampled and self.opinion < 0:
                     self.opinion = opt_idx
             else:
+                op = None
                 rx = None
                 try:
                     rx, _, front, rear = await self.robot.receive()
