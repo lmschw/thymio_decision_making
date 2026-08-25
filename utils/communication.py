@@ -23,19 +23,20 @@ CONF_MAX = (1 << CONF_BITS) - 1        # 63
 
 from utils.utils import clamp01
 
-OPT_BITS, QUAL_BITS, CONF_BITS = 2, 5, 3 # 10 bits total, max 1023 
+def encode_message(option: int, quality01: float, confidence01: float) -> int:
+    op = max(0, min(7, int(option)))
+    q = round(clamp01(quality01) * QUALITY_MAX)
+    c = round(clamp01(confidence01) * CONF_MAX)
+    return (op << (QUALITY_BITS + CONF_BITS)) | (q << CONF_BITS) | c
 
-def encode_message(option, quality01,confidence01): 
-    op = max(0, min(3, int(option))) 
-    q = round(clamp01(quality01) * 31) 
-    c = round(clamp01(confidence01) * 7) 
-    return ((op << 8) | (q << 3) | c) + 1 # +1 so 0 is reserved for "nothing" 
 
-def decode_message(value): 
-    v = int(value[0]) - 1
-    if v < 0: 
-        return None, None, None # rx was 0: no message 
-    return (v >> 8) & 0x3, ((v >> 3) & 31) / 31.0, (v & 7) / 7.0
+def decode_message(value):
+    """Returns (option: int, quality01: float, confidence01: float)."""
+    value = int(value[0])
+    op = (value >> (QUALITY_BITS + CONF_BITS)) & 0x7
+    q = (value >> CONF_BITS) & QUALITY_MAX
+    c = value & CONF_MAX
+    return op, q / QUALITY_MAX, c / CONF_MAX
 
 # smaller encoding
 def encode_opinion_quality(opinion: int, quality: float) -> int:

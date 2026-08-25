@@ -96,7 +96,7 @@ class ActiveInferenceBaselineExperiment:
         option_qualities = self.config.get("option_qualities")
         if option_qualities is None:
             #option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
-            option_qualities = [0.8, 0.6, 0.7]
+            option_qualities = [0.8, 0.3, 0.6]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
@@ -194,21 +194,19 @@ class ActiveInferenceBaselineExperiment:
                 if sampled and self.opinion < 0:
                     self.opinion = opt_idx
             else:
-                op = None
-                rx = None
+                incoming = None
                 try:
-                    rx, _, front, rear = await self.robot.receive()
-                    if rx != 0 and (front + rear) > 0:
-                        op, q_msg, c_msg = decode_message([rx])
-                    if op is not None:
-                        self.beliefs.update_from_message(op, q_msg, c_msg)
-                        self.msgs_rx_total += 1
-                        msgs_rx_tick = 1
-                    await self.robot._set_variables({"prox.comm.rx": [0]}) # clear the latch
+                    incoming = await self.robot.receive()
                 except (TypeError, ValueError):
                     # No message present yet (prox.comm.rx not populated) -
                     # treat as "nothing received" rather than crashing.
-                    rx = None
+                    incoming = None
+                if incoming is not None:
+                    msgs_rx_tick = 1
+                    self.msgs_rx_total += 1
+                    op, q_msg, c_msg = decode_message(incoming)
+                    self.beliefs.update_from_message(op, q_msg, c_msg)
+
 
 
             self.beliefs.decay_precision()
