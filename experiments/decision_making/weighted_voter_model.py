@@ -5,7 +5,7 @@ import numpy as np
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
 from behaviours.decision_making.baseline.voter_model import noisy_measure, process_one_neighbor_message
-from utils.communication import encode_opinion_quality, decode_opinion_quality
+from utils.communication import encode_message, decode_message, SEQ_MAX
 from utils.utils import true_best_option
 
 
@@ -125,6 +125,18 @@ class BaselineVoterBaselineExperiment:
         self.exploit_total = 0
         self.last_explore_bout = 0
         self.last_exploit_bout = 0
+        
+        # --- comms state ---
+        # ARGoS RAB returns only the messages received this tick;
+        # prox.comm.rx instead LATCHES its last value forever. _last_rx
+        # lets us tell a fresh message from one already consumed, and
+        # _tx_seq is the rotating nonce that makes that test work when
+        # two consecutive broadcasts carry identical content.
+        self._last_rx = 0
+        self._tx_seq = 0
+        # top_led() is a full TDM round-trip; only pay for it on change.
+        self._last_led = None
+        self.confidence = 0
 
 
     async def run(self):
@@ -198,23 +210,22 @@ class BaselineVoterBaselineExperiment:
             if self.opinion >= 0:
                 # confidence fixed at 1.0: the baseline/voter model doesn't
                 # use a confidence-weighted update like the AIF variant does.
+                self._tx_seq = (self._tx_seq + 1) & SEQ_MAX
                 await self.robot.send(
-                    encode_opinion_quality(self.opinion, self.q_est))
+                    encode_message(self.opinion, self.q_est, self.confidence,
+                                   self._tx_seq))
                 msgs_tx_tick = 1
                 self.msgs_tx_total += 1
 
             incoming = None
-            try:
-                incoming, _, _, _ = await self.robot.receive()
-            except (TypeError, ValueError):
-                # No message present yet - treat as "nothing received".
-                incoming = None
-            if incoming is not None:
-                msgs_rx_tick = 1
-                self.msgs_rx_total += 1
-                other_op, other_q = decode_opinion_quality(incoming)
+            rx, _intensities, front_intensity, rear_intensity = (
+                await self.robot.receive())
+            if (rx != 0 and rx != self._last_rx
+                    and (front_intensity + rear_intensity) > 0):
+                self._last_rx = rx
+                op, q_msg, _ = decode_message([rx])
                 self.opinion, self.q_est = process_one_neighbor_message(
-                    self.robot, self.opinion, self.q_est, other_op, other_q,
+                    self.robot, self.opinion, self.q_est, op, q_msg,
                     k=self.voter_k)
 
             if self.dissem_timer > 0:
