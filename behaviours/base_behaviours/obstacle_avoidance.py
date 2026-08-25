@@ -115,10 +115,10 @@ class ObstacleAvoidance:
         left = self.wheel_velocity + steer
         right = self.wheel_velocity - steer
 
-        left += random.uniform(-5, 5)
-        right += random.uniform(-5, 5)
-
         left = max(40, min(self.wheel_velocity, left))
         right = max(40, min(self.wheel_velocity, right))
+
+        left += random.uniform(-5, 5)
+        right += random.uniform(-5, 5)
 
         return int(left), int(right)
