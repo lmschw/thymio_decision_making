@@ -6,7 +6,7 @@ from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
 from behaviours.decision_making.active_inference.active_inference_beliefs import ActiveInferenceBeliefs
 from behaviours.decision_making.active_inference.efe_policy import EFEPolicy
-from utils.communication import encode_message, decode_message
+from utils.communication import encode_message, decode_message, SEQ_MAX
 from utils.utils import true_best_option
 
 
@@ -72,7 +72,6 @@ class ActiveInferenceBaselineExperiment:
         self.running = True
         self.paused = False
 
-        # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
         # recomputed every tick from option_qualities - see _tick()
         self.true_best = -1
@@ -95,8 +94,7 @@ class ActiveInferenceBaselineExperiment:
 
         option_qualities = self.config.get("option_qualities")
         if option_qualities is None:
-            #option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
-            option_qualities = [0.8, 0.3, 0.6]
+            option_qualities = [0.8, 0.6, 0.7]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
@@ -130,6 +128,17 @@ class ActiveInferenceBaselineExperiment:
         self.phase_ticks = 0
         self.since_decision = 0
         self.opinion = -1
+
+        # --- comms state ---
+        # ARGoS RAB returns only the messages received this tick;
+        # prox.comm.rx instead LATCHES its last value forever. _last_rx
+        # lets us tell a fresh message from one already consumed, and
+        # _tx_seq is the rotating nonce that makes that test work when
+        # two consecutive broadcasts carry identical content.
+        self._last_rx = 0
+        self._tx_seq = 0
+        # top_led() is a full TDM round-trip; only pay for it on change.
+        self._last_led = None
 
         # --- bookkeeping for the shared CSV log ---
         self.tick_count = 0
@@ -182,6 +191,14 @@ class ActiveInferenceBaselineExperiment:
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
 
+            # --- motion, before anything that can fail ---
+            # _tick() runs under a blanket try/except in run() that stops
+            # the motors, so nothing below this point may pre-empt the
+            # drive command for this tick. Mirrors ControlStep(), which
+            # calls StepMotion() before dispatching to the variant.
+            left, right = self.obstacle_avoidance.step_motion(prox)
+            await self.robot.drive(left, right)
+
             # Detected patch, for logging, regardless of phase.
             opt_idx, _avg_ground = self.ground_sensor.detect_option(reflected)
 
@@ -194,20 +211,21 @@ class ActiveInferenceBaselineExperiment:
                 if sampled and self.opinion < 0:
                     self.opinion = opt_idx
             else:
-                incoming = None
-                try:
-                    incoming = await self.robot.receive()
-                except (TypeError, ValueError):
-                    # No message present yet (prox.comm.rx not populated) -
-                    # treat as "nothing received" rather than crashing.
-                    incoming = None
-                if incoming is not None:
-                    msgs_rx_tick = 1
-                    self.msgs_rx_total += 1
-                    op, q_msg = decode_message(incoming)
-                    self.beliefs.update_from_message(op, q_msg, c_msg)
+                rx, _intensities, front_intensity, rear_intensity = (
+                    await self.robot.receive())
 
-
+                # Three guards, all required:
+                #   rx != 0             -> nothing has ever arrived
+                #   rx != self._last_rx -> same latched value as last time
+                #   intensity > 0       -> no neighbour is in IR range
+                if (rx != 0 and rx != self._last_rx
+                        and (front_intensity + rear_intensity) > 0):
+                    self._last_rx = rx
+                    op, q_msg, c_msg = decode_message([rx])
+                    if op is not None:
+                        msgs_rx_tick = 1
+                        self.msgs_rx_total += 1
+                        self.beliefs.update_from_message(op, q_msg, c_msg)
 
             self.beliefs.decay_precision()
             self.beliefs.recompute_belief_best()
@@ -246,21 +264,23 @@ class ActiveInferenceBaselineExperiment:
             if self.disseminating and self.opinion >= 0:
                 quality = self.beliefs.mu_q[self.opinion]
                 confidence = max(0.05, self.beliefs.epistemic_confidence())
+                # Rotate the nonce so the receiver can tell this broadcast
+                # from the previous one even when the content is identical.
+                self._tx_seq = (self._tx_seq + 1) & SEQ_MAX
                 await self.robot.send(
-                    encode_message(self.opinion, quality, confidence))
+                    encode_message(self.opinion, quality, confidence,
+                                   self._tx_seq))
                 msgs_tx_tick = 1
                 self.msgs_tx_total += 1
-
-            # --- motion ---
-            left, right = self.obstacle_avoidance.step_motion(prox)
-            await self.robot.drive(left, right)
 
             # --- LEDs: colour = current opinion ---
             if 0 <= self.opinion < len(OPINION_COLORS):
                 r, g, b = OPINION_COLORS[self.opinion]
             else:
                 r, g, b = (0, 0, 0)
-            await self.robot.top_led(r, g, b)
+            if (r, g, b) != self._last_led:
+                await self.robot.top_led(r, g, b)
+                self._last_led = (r, g, b)
 
             if self.logger:
                 mu = _pad(self.beliefs.mu_q, 4)
@@ -303,9 +323,9 @@ class ActiveInferenceBaselineExperiment:
                             "pb_0": pb[0], "pb_1": pb[1], "pb_2": pb[2], "pb_3": pb[3],
                             "true_best": self.true_best,
                             "correct": correct,
-                            "q_0": self.option_qualities[0], 
+                            "q_0": self.option_qualities[0],
                             "q_1": self.option_qualities[1],
-                            "q_2": self.option_qualities[2], 
+                            "q_2": self.option_qualities[2],
                         },
                         command={
                             "left_motor": left,
@@ -316,8 +336,8 @@ class ActiveInferenceBaselineExperiment:
                 except Exception as log_exc:
                     # A logging failure must NEVER stop the robot. Print and
                     # move on - motion for this tick already happened above.
-                    print(f"[ActiveInferenceExperiment] logging failed ")
-
+                    print(f"[ActiveInferenceExperiment] logging failed "
+                          f"(motors unaffected): {log_exc!r}")
     async def pause(self):
         self.paused = True
 

@@ -45,12 +45,14 @@ class EFEPolicy:
         sig = max(0.1, self.noise_sigma)
         tau_soc = 1.0 / (sig * sig)
 
-        # IG(explore): posterior std of the option this robot has personally
-        # sampled most confidently (highest tau), scaled by alpha = 20.0.
-        # See CThymioBestOfTwo::EFE_SelectDisseminate for the derivation /
-        # calibration of alpha against exploration-time ratios.
-        tau_map = max(1e-9, max(beliefs.tau_q))
-        ig_explore = 20.0 * math.sqrt(1.0 / tau_map)
+        # IG(explore): posterior std of the LEAST known option (lowest
+        # tau), scaled by alpha = 20.0. The reference controller uses
+        # max_element here, which makes a single ground sample collapse
+        # ig_explore and latch the robot into dissemination before it has
+        # seen the other options at all. See CThymioBestOfTwo::
+        # EFE_SelectDisseminate for the calibration of alpha.
+        tau_min = max(1e-9, min(beliefs.tau_q))
+        ig_explore = 20.0 * math.sqrt(1.0 / tau_min)
 
         # IG(dissem): expected information gain from one incoming message,
         # weighted by current belief over which option is best.
