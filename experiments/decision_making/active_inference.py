@@ -204,7 +204,7 @@ class ActiveInferenceBaselineExperiment:
                 if incoming is not None:
                     msgs_rx_tick = 1
                     self.msgs_rx_total += 1
-                    op, q_msg, c_msg = decode_message(incoming)
+                    op, q_msg = decode_message(incoming)
                     self.beliefs.update_from_message(op, q_msg, c_msg)
 
 
