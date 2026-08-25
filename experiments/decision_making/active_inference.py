@@ -83,7 +83,7 @@ class ActiveInferenceBaselineExperiment:
         self.env_state = 0
 
         # --- motion params ---
-        self.delta = self.config.get("delta", 1000)
+        self.delta = self.config.get("delta", 1400)
         self.wheel_velocity = self.config.get("wheel_velocity", 300)
         self.obstacle_avoidance = ObstacleAvoidance(
             wheel_velocity=self.wheel_velocity,
