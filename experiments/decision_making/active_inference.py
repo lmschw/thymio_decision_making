@@ -194,18 +194,21 @@ class ActiveInferenceBaselineExperiment:
                 if sampled and self.opinion < 0:
                     self.opinion = opt_idx
             else:
-                incoming = None
+                rx = None
                 try:
-                    incoming = await self.robot.receive()
+                    rx, _, front, rear = await self.robot.receive()
+                    if rx != 0 and (front + rear) > 0:
+                        op, q_msg, c_msg = decode_message([rx])
+                    if op is not None:
+                        self.beliefs.update_from_message(op, q_msg, c_msg)
+                        self.msgs_rx_total += 1
+                        msgs_rx_tick = 1
+                    await self.robot._set_variables({"prox.comm.rx": [0]}) # clear the latch
                 except (TypeError, ValueError):
                     # No message present yet (prox.comm.rx not populated) -
                     # treat as "nothing received" rather than crashing.
-                    incoming = None
-                if incoming is not None:
-                    msgs_rx_tick = 1
-                    self.msgs_rx_total += 1
-                    op, q_msg, c_msg = decode_message(incoming)
-                    self.beliefs.update_from_message(op, q_msg, c_msg)
+                    rx = None
+
 
             self.beliefs.decay_precision()
             self.beliefs.recompute_belief_best()
