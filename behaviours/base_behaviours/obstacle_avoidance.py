@@ -4,7 +4,7 @@ class ObstacleAvoidance:
 
     def __init__(
         self,
-        wheel_velocity=100,
+        wheel_velocity=300,
         delta=800,
     ):
         self.wheel_velocity = wheel_velocity
