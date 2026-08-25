@@ -16,27 +16,50 @@ Layout (15 bits, fits the signed 16-bit VM variable behind prox.comm):
     bits 5-0   : confidence  (6 bits, 0-63)
 """
 
-QUALITY_BITS = 6
-CONF_BITS = 6
-QUALITY_MAX = (1 << QUALITY_BITS) - 1  # 63
-CONF_MAX = (1 << CONF_BITS) - 1        # 63
+# QUALITY_BITS = 6
+# CONF_BITS = 6
+# QUALITY_MAX = (1 << QUALITY_BITS) - 1  # 63
+# CONF_MAX = (1 << CONF_BITS) - 1        # 63
+
+# from utils.utils import clamp01
+
+# def encode_message(option: int, quality01: float, confidence01: float) -> int:
+#     op = max(0, min(7, int(option)))
+#     q = round(clamp01(quality01) * QUALITY_MAX)
+#     c = round(clamp01(confidence01) * CONF_MAX)
+#     return (op << (QUALITY_BITS + CONF_BITS)) | (q << CONF_BITS) | c
+
+
+# def decode_message(value):
+#     """Returns (option: int, quality01: float, confidence01: float)."""
+#     value = int(value[0])
+#     op = (value >> (QUALITY_BITS + CONF_BITS)) & 0x7
+#     q = (value >> CONF_BITS) & QUALITY_MAX
+#     c = value & CONF_MAX
+#     return op, q / QUALITY_MAX, c / CONF_MAX
+
+OPT_BITS = 2
+QUALITY_BITS = 5
+SEQ_BITS = 3
+OPT_MAX = (1 << OPT_BITS) - 1
+QUALITY_MAX = (1 << QUALITY_BITS) - 1
+SEQ_MAX = (1 << SEQ_BITS) - 1
 
 from utils.utils import clamp01
 
-def encode_message(option: int, quality01: float, confidence01: float) -> int:
-    op = max(0, min(7, int(option)))
+def encode_message(option: int, quality01: float, seq: int = 0) -> int:
+    op = max(0, min(OPT_MAX, int(option)))
     q = round(clamp01(quality01) * QUALITY_MAX)
-    c = round(clamp01(confidence01) * CONF_MAX)
-    return (op << (QUALITY_BITS + CONF_BITS)) | (q << CONF_BITS) | c
-
+    packed = (op << (QUALITY_BITS + SEQ_BITS)) | (q << SEQ_BITS) | (int(seq) & SEQ_MAX)
+    return packed or 1 # never transmit 0; it is the “nothing received” sentinel
 
 def decode_message(value):
-    """Returns (option: int, quality01: float, confidence01: float)."""
-    value = int(value[0])
-    op = (value >> (QUALITY_BITS + CONF_BITS)) & 0x7
-    q = (value >> CONF_BITS) & QUALITY_MAX
-    c = value & CONF_MAX
-    return op, q / QUALITY_MAX, c / CONF_MAX
+    packed = int(value[0])
+    if packed <= 0:
+        return None, None
+    op = (packed >> (QUALITY_BITS + SEQ_BITS)) & OPT_MAX
+    q = (packed >> SEQ_BITS) & QUALITY_MAX
+    return op, q / QUALITY_MAX
 
 # smaller encoding
 def encode_opinion_quality(opinion: int, quality: float) -> int:

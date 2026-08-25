@@ -316,8 +316,7 @@ class ActiveInferenceBaselineExperiment:
                 except Exception as log_exc:
                     # A logging failure must NEVER stop the robot. Print and
                     # move on - motion for this tick already happened above.
-                    print(f"[ActiveInferenceExperiment] logging failed "
-                          f"(motors unaffected): {log_exc!r}")
+                    print(f"[ActiveInferenceExperiment] logging failed ")
 
     async def pause(self):
         self.paused = True
