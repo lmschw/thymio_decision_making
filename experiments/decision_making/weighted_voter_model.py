@@ -87,7 +87,7 @@ class BaselineVoterBaselineExperiment:
         option_qualities = self.config.get("option_qualities")
         if option_qualities is None:
             #option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
-            option_qualities = [0.8, 0.6, 0.7]
+            option_qualities = [0.8, 0.3, 0.6]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
@@ -217,7 +217,6 @@ class BaselineVoterBaselineExperiment:
                 msgs_tx_tick = 1
                 self.msgs_tx_total += 1
 
-            incoming = None
             rx, _intensities, front_intensity, rear_intensity = (
                 await self.robot.receive())
             if (rx != 0 and rx != self._last_rx

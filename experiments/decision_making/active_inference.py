@@ -94,7 +94,7 @@ class ActiveInferenceBaselineExperiment:
 
         option_qualities = self.config.get("option_qualities")
         if option_qualities is None:
-            option_qualities = [0.8, 0.6, 0.7]
+            option_qualities = [0.8, 0.3, 0.6]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
