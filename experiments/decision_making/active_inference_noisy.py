@@ -10,7 +10,7 @@ class ActiveInferenceNoisyExperiment(ActiveInferenceBaselineExperiment):
     in argos_code/).
     """
 
-    DEFAULT_NOISE_SIGMA = 0.4
+    DEFAULT_NOISE_SIGMA = 0.6
 
     def __init__(self, robot, config=None, logger=None):
         config = dict(config or {})
