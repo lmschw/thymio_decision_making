@@ -7,30 +7,16 @@ experiments:
     class: experiments.decision_making.active_inference.ActiveInferenceBaselineExperiment
   active_inference_noisy:
     class: experiments.decision_making.active_inference_noisy.ActiveInferenceNoisyExperiment
-  active_inference_quality_switch:
-    class: experiments.decision_making.active_inference_quality_switch.ActiveInferenceQualitySwitchExperiment
-  active_inference_noisy_quality_switch:
-    class: experiments.decision_making.active_inference_noisy_quality_switch.ActiveInferenceNoisyQualitySwitchExperiment
   weighted_voter_baseline:
     class: experiments.decision_making.weighted_voter_model.BaselineVoterBaselineExperiment
   weighted_voter_noisy:
     class: experiments.decision_making.weighted_voter_model_noisy.BaselineVoterNoisyExperiment
-  weighted_voter_quality_switch:
-    class: experiments.decision_making.weighted_voter_model_quality_switch.BaselineVoterQualitySwitchExperiment
-  weighted_voter_noisy_quality_switch:
-    class: experiments.decision_making.weighted_voter_model_noisy_quality_switch.BaselineVoterNoisyQualitySwitchExperiment
   majority_voting_baseline:
     class: experiments.decision_making.majority_voting.MajorityVotingBaselineExperiment
   majority_voting_noisy:
     class: experiments.decision_making.majority_voting_noisy.MajorityVotingNoisyExperiment
-  majority_voting_quality_switch:
-    class: experiments.decision_making.majority_voting_quality_switch.MajorityVotingQualitySwitchExperiment
-  majority_voting_noisy_quality_switch:
-    class: experiments.decision_making.majority_voting_noisy_quality_switch.MajorityVotingNoisyQualitySwitchExperiment
   cross_inhibition_baseline:
     class: experiments.decision_making.cross_inhibition.CrossInhibitionBaselineExperiment
-  cross_inhibition_quality_switch:
-    class: experiments.decision_making.cross_inhibition_quality_switch.CrossInhibitionQualitySwitchExperiment
   colour_recognition:
     class: experiments.base_components.colour_recognition.ColourRecognitionExperiment
   colour_test:

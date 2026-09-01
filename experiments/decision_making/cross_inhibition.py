@@ -1,12 +1,12 @@
 import asyncio
 import time
+import numpy as np
 
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
 from behaviours.decision_making.cross_inhibition.cross_inhibition_model import process_neighbor_message
-from behaviours.decision_making.environment.quality_switch import QualitySwitch
 from utils.communication import encode_opinion_quality, decode_opinion_quality
-from utils.utils import true_best_option, OPTION_NAMES, pad_to_length
+from utils.utils import true_best_option
 
 
 OPINION_COLORS = [
@@ -52,19 +52,19 @@ class CrossInhibitionBaselineExperiment:
     detected from flag transitions directly, the same way the ARGoS loop
     functions do it generically in TrackAndLog().
 
-    Optionally, `swap_seconds` / `gradual_reversal_seconds` config keys
-    enable the same quality-reversal environment perturbation as ARGoS's
-    loop functions (see behaviours.decision_making.environment.quality_switch)
-    - disabled by default (swap_seconds=0). Wall-clock rather than
-    tick-count, for the same reason as `duration_seconds` below. Note
-    noise_sigma has no effect here (there is nothing in this variant that
-    consumes it, matching ARGoS - cross-inhibition never calls
-    NoisyMeasure).
-
-    Optionally, `duration_seconds` stops the robot automatically once that
-    many wall-clock seconds have elapsed since the first tick - unset by
-    default (runs until externally stopped). Set the same value across
-    variants to keep run lengths comparable.
+    A quality swap is triggered live, at any moment, by calling
+    internal_update("swap") - this swaps the qualities of whichever two
+    options currently hold the lowest and highest quality. It's driven by
+    an external controller (e.g. decision_external_repo.py's
+    send_swap_command), not scheduled internally: this class has no
+    tick-based swap schedule or duration cutoff of its own - both the
+    swap timing and the overall run length are controlled from outside
+    (via internal_update and an explicit stop()). Note noise_sigma has no
+    effect here (there is nothing in this variant that consumes it,
+    matching ARGoS - cross-inhibition never calls NoisyMeasure), and
+    since cross-inhibition's own decision loop never reads
+    option_qualities, a swap only ever affects true_best/env_state
+    logging here, not robot behaviour.
     """
 
     def __init__(self, robot, config=None, logger=None):
@@ -75,24 +75,14 @@ class CrossInhibitionBaselineExperiment:
         self.running = True
         self.paused = False
 
-        # --- total run duration, for cross-variant comparability - disabled
-        # (run until externally stopped) unless configured. Wall-clock
-        # rather than tick-count, since tick_count is a local unsynchronized
-        # per-robot counter (see the `timestamp` field / _tick()) and
-        # different variants have different per-tick overhead.
-        self.duration_seconds = self.config.get("duration_seconds")
-        self.start_time = None
-
         # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
         # recomputed every tick from option_qualities - see _tick()
         self.true_best = -1
 
-        # --- quality-reversal environment perturbation (off by default) ---
-        self.quality_switch = QualitySwitch(
-            swap_seconds=self.config.get("swap_seconds", 0),
-            gradual_reversal_seconds=self.config.get("gradual_reversal_seconds", 0),
-        )
+        # env_state: 0 = no quality swap yet, 2 = swapped. Set by
+        # internal_update("swap") - swaps are instantaneous and
+        # externally triggered, there is no scheduled/gradual transition.
         self.env_state = 0
 
         # --- motion params ---
@@ -108,14 +98,12 @@ class CrossInhibitionBaselineExperiment:
 
         option_qualities = self.config.get("option_qualities")
         if option_qualities is None:
-            option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
+            #option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
+            option_qualities = [0.8, 0.6, 0.4]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
         self.true_best = true_best_option(self.option_qualities)
-        # names are fixed (tied to ground-patch colour, not quality) even
-        # if a quality-switch later swaps qualities between option indices
-        self.option_names = OPTION_NAMES[:self.num_options]
 
         self.kappa_recruit = self.config.get("kappa_recruit", 0.4)
         self.kappa_inhib = self.config.get("kappa_inhib", 1.0)
@@ -175,17 +163,9 @@ class CrossInhibitionBaselineExperiment:
         # simulation clock), so post-hoc analysis needs a real timestamp to
         # align ticks across robots rather than trusting raw tick numbers.
         wall_time = time.time()
-        if self.start_time is None:
-            self.start_time = wall_time
-        elapsed = wall_time - self.start_time
-        if (self.duration_seconds is not None
-                and elapsed >= self.duration_seconds):
-            self.running = False
 
-        # Apply the quality-reversal schedule (no-op unless swap_seconds is
-        # configured) and refresh env_state/true_best for this tick.
-        self.quality_switch.apply(elapsed, self.option_qualities)
-        self.env_state = self.quality_switch.env_state(elapsed)
+        # option_qualities can change at any moment via internal_update
+        # ("swap"), so true_best must be recomputed live every tick.
         self.true_best = true_best_option(self.option_qualities)
 
         prox = await self.robot.proximity_horizontal()
@@ -256,8 +236,6 @@ class CrossInhibitionBaselineExperiment:
         if self.logger:
             correct = ("" if self.true_best is None
                        else int(self.opinion == self.true_best))
-            opt_names = pad_to_length(self.option_names, 4)
-            opt_quals = pad_to_length(self.option_qualities, 4)
             try:
                 self.logger.log(
                     state={
@@ -281,10 +259,6 @@ class CrossInhibitionBaselineExperiment:
                         "env_state": self.env_state,
                         "true_best": self.true_best,
                         "correct": correct,
-                        "option_name_0": opt_names[0], "option_name_1": opt_names[1],
-                        "option_name_2": opt_names[2], "option_name_3": opt_names[3],
-                        "option_quality_0": opt_quals[0], "option_quality_1": opt_quals[1],
-                        "option_quality_2": opt_quals[2], "option_quality_3": opt_quals[3],
                     },
                     command={
                         "left_motor": left,
@@ -306,3 +280,28 @@ class CrossInhibitionBaselineExperiment:
 
     async def stop(self):
         self.running = False
+
+    async def internal_update(self, update_type):
+        """
+        Live, externally-triggered environment update - the sole way a
+        quality swap happens now (no internal scheduling or duration
+        cutoff exists in this class; both are controlled from outside).
+
+        update_type="swap": swaps the qualities of whichever two options
+        currently hold the lowest and highest quality (not fixed to
+        options 0/1), and marks env_state as post-change (2). Meant to be
+        invoked on demand by an external controller (e.g. via a
+        session-level command), independent of this robot's own
+        tick_count. As noted above, this only affects true_best/env_state
+        logging here - cross-inhibition's own decision loop never reads
+        option_qualities.
+        """
+        if update_type == "swap":
+            i_min = np.argmin(self.option_qualities)
+            i_max = np.argmax(self.option_qualities)
+            v_max = self.option_qualities[i_max]
+            self.option_qualities[i_max] = self.option_qualities[i_min]
+            self.option_qualities[i_min] = v_max
+            self.env_state = 2
+            print("option_quality", self.option_qualities)
+

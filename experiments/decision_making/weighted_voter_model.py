@@ -1,12 +1,12 @@
 import asyncio
 import time
+import numpy as np
 
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
 from behaviours.decision_making.baseline.voter_model import noisy_measure, process_one_neighbor_message
-from behaviours.decision_making.environment.quality_switch import QualitySwitch
-from utils.communication import encode_opinion_quality, decode_opinion_quality
-from utils.utils import true_best_option, OPTION_NAMES, pad_to_length
+from utils.communication import encode_message, decode_message, SEQ_MAX
+from utils.utils import true_best_option
 
 
 OPINION_COLORS = [
@@ -45,16 +45,14 @@ class BaselineVoterBaselineExperiment:
         counts down to 0, after which the robot returns to exploring - so
         a robot with a higher-quality opinion broadcasts for longer.
 
-    Optionally, `swap_seconds` / `gradual_reversal_seconds` config keys
-    enable the same quality-reversal environment perturbation as ARGoS's
-    loop functions (see behaviours.decision_making.environment.quality_switch)
-    - disabled by default (swap_seconds=0). Wall-clock rather than
-    tick-count, for the same reason as `duration_seconds` below.
-
-    Optionally, `duration_seconds` stops the robot automatically once that
-    many wall-clock seconds have elapsed since the first tick - unset by
-    default (runs until externally stopped). Set the same value across
-    variants to keep run lengths comparable.
+    A quality swap is triggered live, at any moment, by calling
+    internal_update("swap") - this swaps the qualities of whichever two
+    options currently hold the lowest and highest quality. It's driven by
+    an external controller (e.g. decision_external_repo.py's
+    send_swap_command), not scheduled internally: this class has no
+    tick-based swap schedule or duration cutoff of its own - both the
+    swap timing and the overall run length are controlled from outside
+    (via internal_update and an explicit stop()).
     """
 
     def __init__(self, robot, config=None, logger=None):
@@ -65,24 +63,14 @@ class BaselineVoterBaselineExperiment:
         self.running = True
         self.paused = False
 
-        # --- total run duration, for cross-variant comparability - disabled
-        # (run until externally stopped) unless configured. Wall-clock
-        # rather than tick-count, since tick_count is a local unsynchronized
-        # per-robot counter (see the `timestamp` field / _tick()) and
-        # different variants have different per-tick overhead.
-        self.duration_seconds = self.config.get("duration_seconds")
-        self.start_time = None
-
         # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
         # recomputed every tick from option_qualities - see _tick()
         self.true_best = -1
 
-        # --- quality-reversal environment perturbation (off by default) ---
-        self.quality_switch = QualitySwitch(
-            swap_seconds=self.config.get("swap_seconds", 0),
-            gradual_reversal_seconds=self.config.get("gradual_reversal_seconds", 0),
-        )
+        # env_state: 0 = no quality swap yet, 2 = swapped. Set by
+        # internal_update("swap") - swaps are instantaneous and
+        # externally triggered, there is no scheduled/gradual transition.
         self.env_state = 0
 
         # --- motion params ---
@@ -98,14 +86,12 @@ class BaselineVoterBaselineExperiment:
 
         option_qualities = self.config.get("option_qualities")
         if option_qualities is None:
-            option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
+            #option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
+            option_qualities = [0.8, 0.3, 0.6]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
         self.true_best = true_best_option(self.option_qualities)
-        # names are fixed (tied to ground-patch colour, not quality) even
-        # if a quality-switch later swaps qualities between option indices
-        self.option_names = OPTION_NAMES[:self.num_options]
 
         self.noise_sigma = self.config.get("noise_sigma", 0.05)
         self.voter_k = self.config.get("voter_k", 6.0)
@@ -139,6 +125,19 @@ class BaselineVoterBaselineExperiment:
         self.exploit_total = 0
         self.last_explore_bout = 0
         self.last_exploit_bout = 0
+        
+        # --- comms state ---
+        # ARGoS RAB returns only the messages received this tick;
+        # prox.comm.rx instead LATCHES its last value forever. _last_rx
+        # lets us tell a fresh message from one already consumed, and
+        # _tx_seq is the rotating nonce that makes that test work when
+        # two consecutive broadcasts carry identical content.
+        self._last_rx = 0
+        self._tx_seq = 0
+        # top_led() is a full TDM round-trip; only pay for it on change.
+        self._last_led = None
+        self.confidence = 0
+
 
     async def run(self):
         while self.running:
@@ -163,25 +162,19 @@ class BaselineVoterBaselineExperiment:
 
     async def _tick(self):
         self.tick_count += 1
+        self.sample_generated = 0
+        self.sampled_patch = -1
+        self.sampled_quality = None
         # Wall-clock time, for cross-robot alignment: tick_count is a local,
         # unsynchronized per-robot counter (unlike ARGoS's single shared
         # simulation clock), so post-hoc analysis needs a real timestamp to
         # align ticks across robots rather than trusting raw tick numbers.
         wall_time = time.time()
-        if self.start_time is None:
-            self.start_time = wall_time
-        elapsed = wall_time - self.start_time
-        if (self.duration_seconds is not None
-                and elapsed >= self.duration_seconds):
-            self.running = False
 
-        # Apply the quality-reversal schedule (no-op unless swap_seconds is
-        # configured) and refresh env_state/true_best for this tick - both
-        # must track option_qualities live so they stay correct across a
-        # quality-swap, matching GetTrueBestOption() being recomputed fresh
-        # every tick in the ARGoS controller.
-        self.quality_switch.apply(elapsed, self.option_qualities)
-        self.env_state = self.quality_switch.env_state(elapsed)
+        # option_qualities can change at any moment via internal_update
+        # ("swap"), so true_best must be recomputed live every tick,
+        # matching GetTrueBestOption() being recomputed fresh every tick
+        # in the ARGoS controller.
         self.true_best = true_best_option(self.option_qualities)
 
         prox = await self.robot.proximity_horizontal()
@@ -217,23 +210,21 @@ class BaselineVoterBaselineExperiment:
             if self.opinion >= 0:
                 # confidence fixed at 1.0: the baseline/voter model doesn't
                 # use a confidence-weighted update like the AIF variant does.
+                self._tx_seq = (self._tx_seq + 1) & SEQ_MAX
                 await self.robot.send(
-                    encode_opinion_quality(self.opinion, self.q_est))
+                    encode_message(self.opinion, self.q_est, self.confidence,
+                                   self._tx_seq))
                 msgs_tx_tick = 1
                 self.msgs_tx_total += 1
 
-            incoming = None
-            try:
-                incoming, _, _, _ = await self.robot.receive()
-            except (TypeError, ValueError):
-                # No message present yet - treat as "nothing received".
-                incoming = None
-            if incoming is not None:
-                msgs_rx_tick = 1
-                self.msgs_rx_total += 1
-                other_op, other_q = decode_opinion_quality(incoming)
+            rx, _intensities, front_intensity, rear_intensity = (
+                await self.robot.receive())
+            if (rx != 0 and rx != self._last_rx
+                    and (front_intensity + rear_intensity) > 0):
+                self._last_rx = rx
+                op, q_msg, _ = decode_message([rx])
                 self.opinion, self.q_est = process_one_neighbor_message(
-                    self.robot, self.opinion, self.q_est, other_op, other_q,
+                    self.robot, self.opinion, self.q_est, op, q_msg,
                     k=self.voter_k)
 
             if self.dissem_timer > 0:
@@ -262,8 +253,6 @@ class BaselineVoterBaselineExperiment:
         if self.logger:
             correct = ("" if self.true_best is None
                        else int(self.opinion == self.true_best))
-            opt_names = pad_to_length(self.option_names, 4)
-            opt_quals = pad_to_length(self.option_qualities, 4)
             try:
                 self.logger.log(
                     state={
@@ -287,10 +276,9 @@ class BaselineVoterBaselineExperiment:
                         "env_state": self.env_state,
                         "true_best": self.true_best,
                         "correct": correct,
-                        "option_name_0": opt_names[0], "option_name_1": opt_names[1],
-                        "option_name_2": opt_names[2], "option_name_3": opt_names[3],
-                        "option_quality_0": opt_quals[0], "option_quality_1": opt_quals[1],
-                        "option_quality_2": opt_quals[2], "option_quality_3": opt_quals[3],
+                        "sample_generated": self.sample_generated,
+                        "sampled_patch": self.sampled_patch,
+                        "sampled_quality": round(self.sampled_quality, 6) if self.sampled_quality is not None else "",
                     },
                     command={
                         "left_motor": left,
@@ -315,6 +303,9 @@ class BaselineVoterBaselineExperiment:
         if opt_idx < 0 or opt_idx >= len(self.option_qualities):
             return False
         q = noisy_measure(self.option_qualities[opt_idx], self.noise_sigma)
+        self.sample_generated = 1
+        self.sampled_patch = opt_idx
+        self.sampled_quality = q
         if self.opinion < 0:
             self.opinion = opt_idx
             self.q_est = q
@@ -332,3 +323,26 @@ class BaselineVoterBaselineExperiment:
 
     async def stop(self):
         self.running = False
+
+    async def internal_update(self, update_type):
+        """
+        Live, externally-triggered environment update - the sole way a
+        quality swap happens now (no internal scheduling or duration
+        cutoff exists in this class; both are controlled from outside).
+
+        update_type="swap": swaps the qualities of whichever two options
+        currently hold the lowest and highest quality (not fixed to
+        options 0/1), and marks env_state as post-change (2). Meant to be
+        invoked on demand by an external controller (e.g. via a
+        session-level command), independent of this robot's own
+        tick_count.
+        """
+        if update_type == "swap":
+            i_min = np.argmin(self.option_qualities)
+            i_max = np.argmax(self.option_qualities)
+            v_max = self.option_qualities[i_max]
+            self.option_qualities[i_max] = self.option_qualities[i_min]
+            self.option_qualities[i_min] = v_max
+            self.env_state = 2
+            print("option_quality", self.option_qualities)
+

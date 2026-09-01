@@ -1,13 +1,13 @@
 import asyncio
 import time
+import numpy as np
 
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
 from behaviours.decision_making.active_inference.active_inference_beliefs import ActiveInferenceBeliefs
 from behaviours.decision_making.active_inference.efe_policy import EFEPolicy
-from behaviours.decision_making.environment.quality_switch import QualitySwitch
-from utils.communication import encode_message, decode_message
-from utils.utils import true_best_option, OPTION_NAMES, pad_to_length
+from utils.communication import encode_message, decode_message, SEQ_MAX
+from utils.utils import true_best_option
 
 
 OPINION_COLORS = [
@@ -16,6 +16,13 @@ OPINION_COLORS = [
     (0, 0, 32),   # option 2 -> blue
     (32, 32, 0),  # option 3 -> yellow
 ]
+
+
+def _pad(values, length):
+    """Right-pads a list with "" so mu_0..3/tau_0..3/pb_0..3 always have
+    a value to log even when num_options < 4."""
+    values = list(values)[:length]
+    return values + [""] * (length - len(values))
 
 
 class ActiveInferenceBaselineExperiment:
@@ -47,16 +54,14 @@ class ActiveInferenceBaselineExperiment:
       option_centers, allowed_offset,
       delta, wheel_velocity, turn_steps
 
-    Optionally, `swap_seconds` / `gradual_reversal_seconds` config keys
-    enable the same quality-reversal environment perturbation as ARGoS's
-    loop functions (see behaviours.decision_making.environment.quality_switch)
-    - disabled by default (swap_seconds=0). Wall-clock rather than
-    tick-count, for the same reason as `duration_seconds` below.
-
-    Optionally, `duration_seconds` stops the robot automatically once that
-    many wall-clock seconds have elapsed since the first tick - unset by
-    default (runs until externally stopped). Set the same value across
-    variants to keep run lengths comparable.
+    A quality swap is triggered live, at any moment, by calling
+    internal_update("swap") - this swaps the qualities of whichever two
+    options currently hold the lowest and highest quality. It's driven by
+    an external controller (e.g. decision_external_repo.py's
+    send_swap_command), not scheduled internally: this class has no
+    tick-based swap schedule or duration cutoff of its own - both the
+    swap timing and the overall run length are controlled from outside
+    (via internal_update and an explicit stop()).
     """
 
     def __init__(self, robot, config=None, logger=None):
@@ -67,24 +72,13 @@ class ActiveInferenceBaselineExperiment:
         self.running = True
         self.paused = False
 
-        # --- total run duration, for cross-variant comparability - disabled
-        # (run until externally stopped) unless configured. Wall-clock
-        # rather than tick-count, since tick_count is a local unsynchronized
-        # per-robot counter (see the `timestamp` field / _tick()) and
-        # different variants have different per-tick overhead.
-        self.duration_seconds = self.config.get("duration_seconds")
-        self.start_time = None
-
-        # --- identity, for the shared CSV log ---
         self.robot_id = self.config.get("robot_id", "")
         # recomputed every tick from option_qualities - see _tick()
         self.true_best = -1
 
-        # --- quality-reversal environment perturbation (off by default) ---
-        self.quality_switch = QualitySwitch(
-            swap_seconds=self.config.get("swap_seconds", 0),
-            gradual_reversal_seconds=self.config.get("gradual_reversal_seconds", 0),
-        )
+        # env_state: 0 = no quality swap yet, 2 = swapped. Set by
+        # internal_update("swap") - swaps are instantaneous and
+        # externally triggered, there is no scheduled/gradual transition.
         self.env_state = 0
 
         # --- motion params ---
@@ -100,14 +94,11 @@ class ActiveInferenceBaselineExperiment:
 
         option_qualities = self.config.get("option_qualities")
         if option_qualities is None:
-            option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
+            option_qualities = [0.8, 0.3, 0.6]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
         self.true_best = true_best_option(self.option_qualities)
-        # names are fixed (tied to ground-patch colour, not quality) even
-        # if a quality-switch later swaps qualities between option indices
-        self.option_names = OPTION_NAMES[:self.num_options]
 
         self.min_dwell = self.config.get("min_dwell", 30)
         self.decide_every = self.config.get("decide_every", 5)
@@ -137,6 +128,17 @@ class ActiveInferenceBaselineExperiment:
         self.phase_ticks = 0
         self.since_decision = 0
         self.opinion = -1
+
+        # --- comms state ---
+        # ARGoS RAB returns only the messages received this tick;
+        # prox.comm.rx instead LATCHES its last value forever. _last_rx
+        # lets us tell a fresh message from one already consumed, and
+        # _tx_seq is the rotating nonce that makes that test work when
+        # two consecutive broadcasts carry identical content.
+        self._last_rx = 0
+        self._tx_seq = 0
+        # top_led() is a full TDM round-trip; only pay for it on change.
+        self._last_led = None
 
         # --- bookkeeping for the shared CSV log ---
         self.tick_count = 0
@@ -178,25 +180,24 @@ class ActiveInferenceBaselineExperiment:
             # timestamp to align ticks across robots rather than trusting
             # raw tick numbers.
             wall_time = time.time()
-            if self.start_time is None:
-                self.start_time = wall_time
-            elapsed = wall_time - self.start_time
-            if (self.duration_seconds is not None
-                    and elapsed >= self.duration_seconds):
-                self.running = False
 
-            # Apply the quality-reversal schedule (no-op unless swap_seconds
-            # is configured) and refresh env_state/true_best for this tick.
-            # Mutates option_qualities in place, so self.beliefs (which
-            # holds the same list reference) sees the update too, and
-            # true_best tracks it live, matching GetTrueBestOption() being
-            # recomputed fresh every tick in the ARGoS controller.
-            self.quality_switch.apply(elapsed, self.option_qualities)
-            self.env_state = self.quality_switch.env_state(elapsed)
+            # option_qualities can change at any moment via internal_update
+            # ("swap") - since self.beliefs holds the same list reference,
+            # it sees the update too. true_best must be recomputed live
+            # every tick, matching GetTrueBestOption() being recomputed
+            # fresh every tick in the ARGoS controller.
             self.true_best = true_best_option(self.option_qualities)
 
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
+
+            # --- motion, before anything that can fail ---
+            # _tick() runs under a blanket try/except in run() that stops
+            # the motors, so nothing below this point may pre-empt the
+            # drive command for this tick. Mirrors ControlStep(), which
+            # calls StepMotion() before dispatching to the variant.
+            left, right = self.obstacle_avoidance.step_motion(prox)
+            await self.robot.drive(left, right)
 
             # Detected patch, for logging, regardless of phase.
             opt_idx, _avg_ground = self.ground_sensor.detect_option(reflected)
@@ -210,18 +211,21 @@ class ActiveInferenceBaselineExperiment:
                 if sampled and self.opinion < 0:
                     self.opinion = opt_idx
             else:
-                incoming = None
-                try:
-                    incoming = await self.robot.receive()
-                except (TypeError, ValueError):
-                    # No message present yet (prox.comm.rx not populated) -
-                    # treat as "nothing received" rather than crashing.
-                    incoming = None
-                if incoming is not None:
-                    msgs_rx_tick = 1
-                    self.msgs_rx_total += 1
-                    op, q_msg, c_msg = decode_message(incoming)
-                    self.beliefs.update_from_message(op, q_msg, c_msg)
+                rx, _intensities, front_intensity, rear_intensity = (
+                    await self.robot.receive())
+
+                # Three guards, all required:
+                #   rx != 0             -> nothing has ever arrived
+                #   rx != self._last_rx -> same latched value as last time
+                #   intensity > 0       -> no neighbour is in IR range
+                if (rx != 0 and rx != self._last_rx
+                        and (front_intensity + rear_intensity) > 0):
+                    self._last_rx = rx
+                    op, q_msg, c_msg = decode_message([rx])
+                    if op is not None:
+                        msgs_rx_tick = 1
+                        self.msgs_rx_total += 1
+                        self.beliefs.update_from_message(op, q_msg, c_msg)
 
             self.beliefs.decay_precision()
             self.beliefs.recompute_belief_best()
@@ -260,28 +264,28 @@ class ActiveInferenceBaselineExperiment:
             if self.disseminating and self.opinion >= 0:
                 quality = self.beliefs.mu_q[self.opinion]
                 confidence = max(0.05, self.beliefs.epistemic_confidence())
+                # Rotate the nonce so the receiver can tell this broadcast
+                # from the previous one even when the content is identical.
+                self._tx_seq = (self._tx_seq + 1) & SEQ_MAX
                 await self.robot.send(
-                    encode_message(self.opinion, quality, confidence))
+                    encode_message(self.opinion, quality, confidence,
+                                   self._tx_seq))
                 msgs_tx_tick = 1
                 self.msgs_tx_total += 1
-
-            # --- motion ---
-            left, right = self.obstacle_avoidance.step_motion(prox)
-            await self.robot.drive(left, right)
 
             # --- LEDs: colour = current opinion ---
             if 0 <= self.opinion < len(OPINION_COLORS):
                 r, g, b = OPINION_COLORS[self.opinion]
             else:
                 r, g, b = (0, 0, 0)
-            await self.robot.top_led(r, g, b)
+            if (r, g, b) != self._last_led:
+                await self.robot.top_led(r, g, b)
+                self._last_led = (r, g, b)
 
             if self.logger:
-                mu = pad_to_length(self.beliefs.mu_q, 4)
-                tau = pad_to_length(self.beliefs.tau_q, 4)
-                pb = pad_to_length(self.beliefs.belief_best, 4)
-                opt_names = pad_to_length(self.option_names, 4)
-                opt_quals = pad_to_length(self.option_qualities, 4)
+                mu = _pad(self.beliefs.mu_q, 4)
+                tau = _pad(self.beliefs.tau_q, 4)
+                pb = _pad(self.beliefs.belief_best, 4)
                 correct = ("" if self.true_best is None
                            else int(self.opinion == self.true_best))
                 try:
@@ -319,10 +323,9 @@ class ActiveInferenceBaselineExperiment:
                             "pb_0": pb[0], "pb_1": pb[1], "pb_2": pb[2], "pb_3": pb[3],
                             "true_best": self.true_best,
                             "correct": correct,
-                            "option_name_0": opt_names[0], "option_name_1": opt_names[1],
-                            "option_name_2": opt_names[2], "option_name_3": opt_names[3],
-                            "option_quality_0": opt_quals[0], "option_quality_1": opt_quals[1],
-                            "option_quality_2": opt_quals[2], "option_quality_3": opt_quals[3],
+                            "q_0": self.option_qualities[0],
+                            "q_1": self.option_qualities[1],
+                            "q_2": self.option_qualities[2],
                         },
                         command={
                             "left_motor": left,
@@ -335,7 +338,6 @@ class ActiveInferenceBaselineExperiment:
                     # move on - motion for this tick already happened above.
                     print(f"[ActiveInferenceExperiment] logging failed "
                           f"(motors unaffected): {log_exc!r}")
-
     async def pause(self):
         self.paused = True
 
@@ -344,3 +346,26 @@ class ActiveInferenceBaselineExperiment:
 
     async def stop(self):
         self.running = False
+
+    async def internal_update(self, update_type):
+        """
+        Live, externally-triggered environment update - the sole way a
+        quality swap happens now (no internal scheduling or duration
+        cutoff exists in this class; both are controlled from outside).
+
+        update_type="swap": swaps the qualities of whichever two options
+        currently hold the lowest and highest quality (not fixed to
+        options 0/1), and marks env_state as post-change (2). Meant to be
+        invoked on demand by an external controller (e.g. via a
+        session-level command), independent of this robot's own
+        tick_count.
+        """
+        if update_type == "swap":
+            i_min = np.argmin(self.option_qualities)
+            i_max = np.argmax(self.option_qualities)
+            v_max = self.option_qualities[i_max]
+            self.option_qualities[i_max] = self.option_qualities[i_min]
+            self.option_qualities[i_min] = v_max
+            self.env_state = 2
+            print("option_quality", self.option_qualities)
+
