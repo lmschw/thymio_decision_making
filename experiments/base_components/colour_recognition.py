@@ -40,7 +40,7 @@ class ColourRecognitionExperiment:
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
 
-            colour = self.ground_sensor.detect_option(reflected)
+            colour, _ = self.ground_sensor.detect_option(reflected)
 
             await self.robot.top_led(0, 0, 0)
 
@@ -63,7 +63,7 @@ class ColourRecognitionExperiment:
                            "reflected_0": reflected[0], 
                            "reflected_1": reflected[1],
                            "reflected_avg": (reflected[0] + reflected[1])/2,
-                           "colour": colour[0]},
+                           "colour": colour},
                     command={
                         "left_motor": left,
                         "right_motor": right,
