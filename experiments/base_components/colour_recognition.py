@@ -42,6 +42,8 @@ class ColourRecognitionExperiment:
 
             colour = self.ground_sensor.detect_option(reflected)
 
+            await self.robot.top_led(0, 0, 0)
+
             if colour == 0:
                 await self.robot.top_led(0, 0, 100)
             elif colour == 1:
