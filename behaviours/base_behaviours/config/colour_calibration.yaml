@@ -1,0 +1,83 @@
+thymio-01:
+  option_centers: [40, 84, 601]
+  allowed_offsets: [15, 15, 25]
+
+thymio-03:
+  option_centers: [41, 80, 548]
+  allowed_offsets: [15, 15, 10]
+
+thymio-04:
+  option_centers: [35, 82, 592]
+  allowed_offsets: [15, 20, 10]
+
+thymio-05:
+  option_centers: [35, 74, 496]
+  allowed_offsets: [15, 15, 10]
+
+thymio-06:
+  option_centers: [54, 118, 772]
+  allowed_offsets: [15, 20, 15]
+
+thymio-07:
+  option_centers: [41, 87, 615]
+  allowed_offsets: [15, 20, 45]
+
+thymio-08:
+  option_centers: [37, 77, 569]
+  allowed_offsets: [15, 15, 40]
+
+thymio-09:
+  option_centers: [44, 97, 596]
+  allowed_offsets: [20, 30, 10]
+
+thymio-10:
+  option_centers: [33, 76, 527]
+  allowed_offsets: [15, 15, 10]
+
+thymio-11:
+  option_centers: [41, 92, 649]
+  allowed_offsets: [15, 20, 10]
+
+thymio-12:
+  option_centers: [50, 101, 640]
+  allowed_offsets: [15, 15, 20]
+
+thymio-13:
+  option_centers: [31, 73, 584]
+  allowed_offsets: [15, 15, 25]
+
+thymio-14:
+  option_centers: [50, 110, 752]
+  allowed_offsets: [15, 15, 10]
+
+thymio-15:
+  option_centers: [42, 93, 698]
+  allowed_offsets: [15, 15, 35]
+
+thymio-16:
+  option_centers: [41, 89, 651]
+  allowed_offsets: [15, 15, 40]
+
+thymio-17:
+  option_centers: [45, 99, 653]
+  allowed_offsets: [15, 15, 15]
+
+thymio-18:
+  option_centers: [36, 82, 634]
+  allowed_offsets: [15, 15, 30]
+
+thymio-19:
+  option_centers: [41, 89, 691]
+  allowed_offsets: [15, 15, 15]
+
+thymio-20:
+  option_centers: [44, 87, 558]
+  allowed_offsets: [15, 15, 15]
+
+thymio-21:
+  option_centers: [42, 83, 548]
+  allowed_offsets: [10, 25, 10]
+
+thymio-25:
+  option_centers: [55, 115, 782]
+  allowed_offsets: [20, 20, 15]
