@@ -1,7 +1,7 @@
 import asyncio
 import math
 
-from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
+from behaviours.base_behaviours.colour_recognition_per_robot import OptionGroundSensor
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from utils.geometry import SENSOR_ANGLES
 
