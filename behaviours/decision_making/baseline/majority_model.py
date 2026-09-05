@@ -19,6 +19,17 @@ switch used by the voter model,
     p_switch = 1 - exp(-k * (q_winner - q_self))
 
 is applied toward the window's current majority winner.
+
+The winning option's quality is the MEAN of the quality values claimed
+for it within the window, not the max. Taking the max over a window
+that mostly accumulates repeated/independent noisy samples from the
+same one or two nearby neighbours (rather than ARGoS's simultaneous
+snapshot of however many distinct neighbours are in range this tick)
+systematically inflates the reported quality as noise or window size
+grows - the max of N noisy draws climbs toward 1.0 with N, so the
+switch-probability formula below would see an almost-always-saturated
+quality and become MORE confident as noise increases, the opposite of
+the intended effect. The mean has no such bias.
 """
 
 import math
@@ -44,21 +55,21 @@ class MajorityVoteTally:
     def winner(self, rng=None):
         """
         Returns (winning_option, winning_quality): the option with the
-        most votes in the window (ties broken randomly) and the highest
-        quality claimed for it - or (None, None) if the window is empty.
+        most votes in the window (ties broken randomly) and the MEAN
+        quality claimed for it within the window (see module docstring
+        for why mean, not max) - or (None, None) if the window is empty.
         """
         rng = rng or random
         if not self.votes:
             return None, None
 
         vote_count = [0.0] * self.num_options
-        best_quality = [0.0] * self.num_options
+        quality_sum = [0.0] * self.num_options
         for opinion, quality in self.votes:
             if opinion < 0 or opinion >= self.num_options:
                 continue
             vote_count[opinion] += 1.0
-            if quality > best_quality[opinion]:
-                best_quality[opinion] = quality
+            quality_sum[opinion] += quality
 
         max_votes = max(vote_count)
         if max_votes <= 0.0:
@@ -66,7 +77,7 @@ class MajorityVoteTally:
 
         ties = [k for k in range(self.num_options) if vote_count[k] == max_votes]
         chosen = rng.choice(ties)
-        return chosen, best_quality[chosen]
+        return chosen, quality_sum[chosen] / vote_count[chosen]
 
 
 def process_majority_tally(opinion, q_est, tally, k=6.0, rng=None):
