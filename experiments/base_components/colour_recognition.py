@@ -1,7 +1,7 @@
 import asyncio
 import math
 
-from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
+from behaviours.base_behaviours.colour_recognition_per_robot import OptionGroundSensor
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from utils.geometry import SENSOR_ANGLES
 
@@ -40,12 +40,18 @@ class ColourRecognitionExperiment:
             prox = await self.robot.proximity_horizontal()
             reflected = await self.robot.proximity_ground_reflected()
 
-            colour = self.ground_sensor.detect_option(reflected)
+            colour, _ = self.ground_sensor.detect_option(reflected)
 
-            if colour[0] >= 0:
-                await self.robot.system_sound(colour[0])
+            await self.robot.top_led(0, 0, 0)
+
+            if colour == 0:
+                await self.robot.top_led(0, 0, 100)
+            elif colour == 1:
+                await self.robot.top_led(0, 100, 0)
+            elif colour == 2:
+                await self.robot.top_led(100, 100, 100)
             else:
-                await self.robot.sound_stop()
+                await self.robot.top_led(100, 0, 0)
 
             left, right = self.obstacle_avoidance.step_motion(prox)
 
@@ -57,7 +63,7 @@ class ColourRecognitionExperiment:
                            "reflected_0": reflected[0], 
                            "reflected_1": reflected[1],
                            "reflected_avg": (reflected[0] + reflected[1])/2,
-                           "colour": colour[0]},
+                           "colour": colour},
                     command={
                         "left_motor": left,
                         "right_motor": right,
