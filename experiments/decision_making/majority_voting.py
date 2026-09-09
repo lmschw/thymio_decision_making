@@ -6,8 +6,8 @@ import numpy as np
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
 from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
 from behaviours.decision_making.baseline.voter_model import noisy_measure
-from behaviours.decision_making.baseline.majority_model import MajorityVoteTally, process_majority_tally
-from utils.communication import encode_message, decode_message, SEQ_MAX
+from behaviours.decision_making.baseline.majority_model import (
+    IdBuffer, majority_from_swarm_info, process_majority_vote)
 from utils.utils import true_best_option
 
 
@@ -34,14 +34,28 @@ class MajorityVotingBaselineExperiment:
     disseminating once `expl_timer` reaches `expl_max_ticks`.
 
     DISSEMINATE phase (timer-driven duration, scaled by quality):
-      - broadcast (opinion, quality) every tick
-      - the real Thymio's prox.comm link only ever exposes ONE message per
-        tick (unlike ARGoS's range-and-bearing sensor, which sees every
-        neighbour's message every tick), so there is nothing to tally
-        votes over within a single tick. Instead, each tick's message is
-        pushed into a rolling `window_ticks`-tick window (MajorityVoteTally)
-        and the majority opinion currently held in that window is applied
-        with the same probabilistic voter-model switch curve.
+      - the real Thymio's prox.comm link only ever exposes ONE ~10-bit
+        message per tick, with no sender id - both constraints make it a
+        poor match for ARGoS's per-tick, multi-neighbour, full-precision
+        range-and-bearing tally (an earlier sliding-window-of-messages
+        attempt to bridge this systematically inflated reported quality
+        under noise - confirmed by simulation - since it was mostly
+        repeated draws from the same one or two nearby robots rather than
+        distinct simultaneous ones). Communication is therefore split
+        across two channels every tick, in EITHER phase:
+          - prox.comm still carries only this robot's short numeric id
+            (`_short_id_int`) - cheap enough to fit trivially, and used
+            purely as a locality signal: `id_buffer` remembers which ids
+            have been heard nearby recently (deduplicated, bounded - see
+            IdBuffer).
+          - the actual (opinion, quality), at full float precision, is
+            exchanged with the whole swarm via the coordinator
+            (Robot.exchange_swarm_info) instead of prox.comm.
+        While disseminating, `majority_from_swarm_info` tallies votes and
+        mean quality only over ids currently in `id_buffer` - restoring
+        genuine "distinct simultaneous neighbours" semantics - and the
+        same probabilistic voter-model switch curve is applied toward
+        the resulting majority option.
       - `dissem_timer`, initialised to tau0 + floor(tau_gain * quality),
         counts down to 0, after which the robot returns to exploring.
 
@@ -101,14 +115,6 @@ class MajorityVotingBaselineExperiment:
         self.tau0 = self.config.get("tau0", 30)
         self.tau_gain = self.config.get("tau_gain", 100)
 
-        # majority-vote window (real-hardware stand-in for ARGoS's
-        # "all messages this tick" tally - see class docstring)
-        self.window_ticks = self.config.get("window_ticks", 20)
-        self.tally = MajorityVoteTally(
-            num_options=self.num_options,
-            window_ticks=self.window_ticks,
-        )
-
         self.ground_sensor = OptionGroundSensor(
             num_options=self.num_options,
             option_centers=self.config.get("option_centers"),
@@ -133,13 +139,44 @@ class MajorityVotingBaselineExperiment:
         self.exploit_total = 0
         self.last_explore_bout = 0
         self.last_exploit_bout = 0
-        
-        #communication
-        self._last_rx = 0
-        self._tx_seq = 0
-        # top_led() is a full TDM round-trip; only pay for it on change.
-        self._last_led = None
-        self.confidence = 0
+
+        # --- swarm-info communication architecture (see class docstring) ---
+        # `_short_id_int` is what actually goes out over prox.comm (an
+        # int is all that channel can carry); `short_id` (its string
+        # form) is the key used with the coordinator, so a receiver's
+        # int-derived lookup key is always exactly the sender's own key
+        # - deriving both from the same int keeps them consistent even
+        # for a non-numeric hostname (see _make_short_id_int).
+        self._short_id_int = self._make_short_id_int(
+            getattr(self.robot, "hostname", "") or self.robot_id)
+        self.short_id = str(self._short_id_int)
+        # Bounded, deduplicated set of recently-nearby ids - refreshed
+        # every tick regardless of phase (see _tick), so it's already
+        # warm by the time a robot starts disseminating. ARGoS's RAB
+        # sensor has no memory (a fresh snapshot every tick), so there's
+        # no literal reference value for these two - see IdBuffer.
+        self.id_buffer = IdBuffer(
+            capacity=self.config.get("id_buffer_capacity", 10),
+            max_age_ticks=self.config.get("id_buffer_max_age_ticks", 20),
+        )
+
+    @staticmethod
+    def _make_short_id_int(hostname):
+        """
+        'thymio-17' -> 17 (bare hostname parsed as an int, if there's no
+        such prefix or it isn't numeric -> a small stable hash instead).
+        This is the id sent over prox.comm AND (as str()) the coordinator
+        key - deriving both from the same int means a receiver decoding
+        the prox.comm int always reconstructs exactly the sender's own
+        coordinator key, with no risk of e.g. a leading zero surviving
+        in one representation but not the other.
+        """
+        prefix = "thymio-"
+        stripped = hostname[len(prefix):] if hostname.startswith(prefix) else hostname
+        try:
+            return int(stripped)
+        except ValueError:
+            return abs(hash(stripped)) % 2000 + 1
 
     async def run(self):
         while self.running:
@@ -182,6 +219,18 @@ class MajorityVotingBaselineExperiment:
         # Detected patch, for logging, regardless of phase.
         opt_idx, _avg = self.ground_sensor.detect_option(reflected)
 
+        # --- id-only locality broadcast, every tick regardless of phase:
+        # this is the ONLY thing still sent over prox.comm for majority
+        # voting now - the actual (opinion, quality) exchange happens
+        # through the coordinator instead (see the DISSEMINATE branch
+        # below). Keeping this warm in both phases means id_buffer
+        # already reflects who's nearby as soon as a robot starts
+        # disseminating, instead of needing to rebuild it from scratch.
+        await self.robot.send(self._short_id_int)
+        id_rx, _id_intensities, id_front, id_rear = await self.robot.receive()
+        if id_rx > 0 and (id_front + id_rear) > 0:
+            self.id_buffer.refresh(str(id_rx), self.tick_count)
+
         msgs_tx_tick = 0
         msgs_rx_tick = 0
         self.phase_ticks += 1
@@ -207,24 +256,25 @@ class MajorityVotingBaselineExperiment:
         else:
             # --- DISSEMINATE ---
             if self.opinion >= 0:
-                # confidence fixed at 1.0: the baseline social models don't
-                # use a confidence-weighted update like the AIF variant does.
-                self._tx_seq = (self._tx_seq + 1) & SEQ_MAX
-                await self.robot.send(
-                    encode_message(self.opinion, self.q_est, self.confidence,
-                                   self._tx_seq))
+                # confidence fixed at 1.0: the baseline social models
+                # don't use a confidence-weighted update like the AIF
+                # variant does, so it isn't part of the exchanged payload.
+                swarm_info = await self.robot.exchange_swarm_info(
+                    self.short_id,
+                    {"opinion": self.opinion, "quality": self.q_est},
+                )
                 msgs_tx_tick = 1
                 self.msgs_tx_total += 1
 
-            rx, _intensities, front_intensity, rear_intensity = (
-                await self.robot.receive())
-            if (rx != 0 and rx != self._last_rx
-                    and (front_intensity + rear_intensity) > 0):
-                self._last_rx = rx
-                op, q_msg, _ = decode_message([rx])
-                self.tally.add(op, q_msg)
-                self.opinion, self.q_est = process_majority_tally(
-                    self.opinion, self.q_est, self.tally, k=self.voter_k)
+                active_ids = self.id_buffer.active_ids(self.tick_count)
+                chosen, winner_quality = majority_from_swarm_info(
+                    active_ids, swarm_info, self.num_options)
+                if chosen is not None:
+                    msgs_rx_tick = 1
+                    self.msgs_rx_total += 1
+                self.opinion, self.q_est = process_majority_vote(
+                    self.opinion, self.q_est, chosen, winner_quality,
+                    k=self.voter_k)
 
             if self.dissem_timer > 0:
                 self.dissem_timer -= 1
@@ -338,4 +388,3 @@ class MajorityVotingBaselineExperiment:
             self.option_qualities[i_min] = v_max
             self.env_state = 2
             print("option_quality", self.option_qualities)
-
