@@ -9,12 +9,12 @@ from utils.communication import encode_message, decode_message, SEQ_MAX
 from utils.utils import true_best_option
 
 
-OPINION_COLORS = [
-    (32, 0, 0),   # option 0 -> red
-    (0, 32, 0),   # option 1 -> green
-    (0, 0, 32),   # option 2 -> blue
-    (32, 32, 0),  # option 3 -> yellow
-]
+OPINION_COLORS = {
+    -1: (32, 0, 0),   # no opinion -> red
+    0: (0, 0, 32),    # option 0 -> dark blue
+    1: (0, 24, 32),   # option 1 -> light blue / cyan
+    2: (32, 32, 32),  # option 2 -> white
+}
 
 
 class BaselineVoterBaselineExperiment:
@@ -244,10 +244,7 @@ class BaselineVoterBaselineExperiment:
         await self.robot.drive(left, right)
 
         # --- LEDs: colour = current opinion ---
-        if 0 <= self.opinion < len(OPINION_COLORS):
-            r, g, b = OPINION_COLORS[self.opinion]
-        else:
-            r, g, b = (0, 0, 0)
+        r, g, b = OPINION_COLORS.get(self.opinion, (0, 0, 0))
         if (r, g, b) != self._last_led:
             if self.robot.has_led_ring:
                 await self.robot.led_ring_fill(r, g, b)
