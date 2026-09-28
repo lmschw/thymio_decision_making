@@ -244,14 +244,16 @@ class BaselineVoterBaselineExperiment:
         await self.robot.drive(left, right)
 
         # --- LEDs: colour = current opinion ---
-        # if self.robot.has_led_ring:
-        #     colour = self.OPINION_COLORS.get(self.opinion, (0, 0, 0))
-        #     if self.tick < self.debug_pixel_until:
-        #         pixels = [colour] * self.robot.led_ring.num_pixels
-        #         pixels[0] = self.debug_pixel_colour
-        #         await self.robot.led_ring_set_pixels(pixels)
-        #     else:
-        #         await self.robot.led_ring_fill(*colour)
+        if 0 <= self.opinion < len(OPINION_COLORS):
+            r, g, b = OPINION_COLORS[self.opinion]
+        else:
+            r, g, b = (0, 0, 0)
+        if (r, g, b) != self._last_led:
+            if self.robot.has_led_ring:
+                await self.robot.led_ring_fill(r, g, b)
+            else:
+                await self.robot.top_led(r, g, b)
+            self._last_led = (r, g, b)
 
         if self.logger:
             correct = ("" if self.true_best is None
