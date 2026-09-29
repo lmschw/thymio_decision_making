@@ -3,7 +3,7 @@ import time
 import numpy as np
 
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
-from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
+from behaviours.base_behaviours.colour_recognition_per_robot import OptionGroundSensor
 from behaviours.decision_making.baseline.voter_model import noisy_measure, process_one_neighbor_message
 from utils.communication import encode_message, decode_message, SEQ_MAX
 from utils.utils import true_best_option
@@ -101,11 +101,7 @@ class BaselineVoterBaselineExperiment:
         self.tau0 = self.config.get("tau0", 30)
         self.tau_gain = self.config.get("tau_gain", 100)
 
-        self.ground_sensor = OptionGroundSensor(
-            num_options=self.num_options,
-            option_centers=self.config.get("option_centers"),
-            allowed_offset=self.config.get("allowed_offset", 50),
-        )
+        self.ground_sensor = OptionGroundSensor(num_options=self.num_options)
 
         # --- opinion state ---
         self.opinion = -1

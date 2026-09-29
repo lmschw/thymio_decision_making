@@ -3,7 +3,7 @@ import time
 import numpy as np
 
 from behaviours.base_behaviours.obstacle_avoidance import ObstacleAvoidance
-from behaviours.base_behaviours.colour_recognition import OptionGroundSensor
+from behaviours.base_behaviours.colour_recognition_per_robot import OptionGroundSensor
 from behaviours.decision_making.active_inference.active_inference_beliefs import ActiveInferenceBeliefs
 from behaviours.decision_making.active_inference.efe_policy import EFEPolicy
 from utils.communication import encode_message, decode_message, SEQ_MAX
@@ -51,7 +51,6 @@ class ActiveInferenceBaselineExperiment:
       num_options, option_qualities,
       efe_gamma, noise_sigma, c_expected, precision_decay, prior_var,
       min_dwell, decide_every,
-      option_centers, allowed_offset,
       delta, wheel_velocity, turn_steps
 
     A quality swap is triggered live, at any moment, by calling
@@ -103,11 +102,7 @@ class ActiveInferenceBaselineExperiment:
         self.min_dwell = self.config.get("min_dwell", 30)
         self.decide_every = self.config.get("decide_every", 5)
 
-        self.ground_sensor = OptionGroundSensor(
-            num_options=self.num_options,
-            option_centers=self.config.get("option_centers"),
-            allowed_offset=self.config.get("allowed_offset", 50),
-        )
+        self.ground_sensor = OptionGroundSensor(num_options=self.num_options)
 
         self.beliefs = ActiveInferenceBeliefs(
             num_options=self.num_options,
