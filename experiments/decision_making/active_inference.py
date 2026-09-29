@@ -13,7 +13,7 @@ from utils.utils import true_best_option
 OPINION_COLORS = {
     -1: (32, 0, 0),   # no opinion -> red
     0: (0, 0, 32),    # option 0 -> dark blue
-    1: (0, 24, 32),   # option 1 -> light blue / cyan
+    1: (0, 32, 0),   # option 1 -> green
     2: (32, 32, 32),  # option 2 -> white
 }
 

@@ -12,7 +12,7 @@ from utils.utils import true_best_option
 
 
 OPINION_COLORS = {
-    -1: (32, 32, 0),   # no opinion -> yellow
+    -1: (32, 0, 0),   # no opinion -> red
     0: (0, 0, 32),    # option 0 -> dark blue
     1: (0, 32, 0),   # option 1 -> green
     2: (32, 32, 32),  # option 2 -> white
@@ -102,7 +102,7 @@ class MajorityVotingBaselineExperiment:
         if option_qualities is None:
             #option_qualities = [max(0.1, 1.0 - 0.4 * i) for i in range(self.num_options)]
             option_qualities = [0.8, 0.3, 0.6]
-            option_qualities = [0.3, 0.8, 0.6]
+            #option_qualities = [0.3, 0.8, 0.6]
         if len(option_qualities) != self.num_options:
             raise ValueError("option_qualities length must match num_options")
         self.option_qualities = option_qualities
