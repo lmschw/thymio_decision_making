@@ -10,6 +10,10 @@ thymio-04:
   option_centers: [47, 176, 667]
   allowed_offsets: [15, 35, 10]
 
+thymio-06:
+  option_centers: [64, 230, 890]
+  allowed_offsets: [20, 35, 10]
+
 thymio-07:
   option_centers: [65, 172, 667]
   allowed_offsets: [30, 45, 10]
