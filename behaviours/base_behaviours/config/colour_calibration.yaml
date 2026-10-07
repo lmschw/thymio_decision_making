@@ -78,6 +78,18 @@ thymio-23:
   option_centers: [104, 710, 856]
   allowed_offsets: [20, 35, 10]
 
+thymio-24:
+  option_centers: [45, 452, 713]
+  allowed_offsets: [20, 100, 10]
+
 thymio-25:
   option_centers: [70, 488, 585]
   allowed_offsets: [20, 55, 10]
+
+thymio-26:
+  option_centers: [45, 452, 713]
+  allowed_offsets: [20, 100, 10]
+
+thymio-27:
+  option_centers: [45, 452, 713]
+  allowed_offsets: [20, 100, 10]
