@@ -6,6 +6,12 @@ import yaml
 UNKNOWN = -1
 WHITE_OPTION = 2
 
+# Ground sensor used for classification (0 = left, 1 = right). The two
+# sensors are not calibrated against each other and can differ by several
+# hundred, so only one of them is used instead of their average. Can be
+# overridden per robot with a "sensor" key in colour_calibration.yaml.
+DEFAULT_SENSOR = 0
+
 CALIBRATION_FILE = (
     Path(__file__).resolve().parent
     / "config"
@@ -20,7 +26,7 @@ class OptionGroundSensor:
 
     #ALLOWED_SENSOR_OFFSET = 40
 
-    def __init__(self, num_options=3):
+    def __init__(self, num_options=3, sensor=None):
         hostname = socket.gethostname()
 
         if hostname not in ROBOT_CALIBRATION:
@@ -34,6 +40,14 @@ class OptionGroundSensor:
 
         self.option_centers = calibration["option_centers"]
         self.allowed_offsets = calibration["allowed_offsets"]
+        self.sensor = (sensor if sensor is not None
+                       else calibration.get("sensor", DEFAULT_SENSOR))
+
+        if self.sensor not in (0, 1):
+            raise ValueError(
+                f"Ground sensor index must be 0 (left) or 1 (right), "
+                f"got {self.sensor}."
+            )
 
         if len(self.option_centers) != num_options:
             raise ValueError(
@@ -71,11 +85,8 @@ class OptionGroundSensor:
         return UNKNOWN
         
     def detect_option(self, reflected):
-        avg = 0.5 * (reflected[0] + reflected[1])
+        value = reflected[self.sensor]
 
-        # if abs(reflected[0] - reflected[1]) >= self.ALLOWED_SENSOR_OFFSET:
-        #     return UNKNOWN, avg
+        colour = self._classify(value)
 
-        colour = self._classify(avg)
-
-        return colour, avg
+        return colour, value

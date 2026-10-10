@@ -10,6 +10,10 @@ no-option" sentinel here - it's a real decision option like black or
 grey (matching a 3-option best-of-3 over black / grey / white patches).
 UNKNOWN only means "this reading doesn't match any calibrated centre
 closely enough", not "this is the empty floor".
+
+Only one ground sensor (sensor_index, default left) is used: the two
+sensors are not calibrated against each other and can differ by several
+hundred, so averaging them makes classification unreliable.
 """
 
 UNKNOWN = -1    # reading doesn't match any calibrated centre closely enough
@@ -18,7 +22,7 @@ UNKNOWN = -1    # reading doesn't match any calibrated centre closely enough
 class OptionGroundSensor:
 
     ALLOWED_OFFSET = 30
-    ALLOWED_SENSOR_OFFSET = 40
+    DEFAULT_SENSOR = 0    # 0 = left, 1 = right
 
     # Default centres, in index order: option 0, option 1, option 2
     # (black, grey, white - calibrated hardware values from
@@ -28,7 +32,8 @@ class OptionGroundSensor:
     def __init__(self,
                  num_options=3,
                  option_centers=None,
-                 allowed_offset=None):
+                 allowed_offset=None,
+                 sensor_index=None):
         self.num_options = num_options
         self.option_centers = (list(option_centers) if option_centers is not None
                                 else self.DEFAULT_OPTION_CENTERS[:num_options])
@@ -38,6 +43,12 @@ class OptionGroundSensor:
                 f"({len(self.option_centers)} != {num_options})")
         self.allowed_offset = (allowed_offset if allowed_offset is not None
                                 else self.ALLOWED_OFFSET)
+        self.sensor_index = (sensor_index if sensor_index is not None
+                             else self.DEFAULT_SENSOR)
+        if self.sensor_index not in (0, 1):
+            raise ValueError(
+                "sensor_index must be 0 (left) or 1 (right), "
+                f"got {self.sensor_index}")
 
     def _classify(self, value: int) -> int:
         """
@@ -63,16 +74,12 @@ class OptionGroundSensor:
         reflected: [left_reading, right_reading] raw ADC values from
         robot.proximity_ground_reflected().
 
-        Returns (option_index, avg_reading):
-          option_index is -1 only if the two sensors disagree on
-          different options, or the reading matches no centre at all.
+        Returns (option_index, reading):
+          reading is the value of the sensor selected by sensor_index;
+          option_index is -1 if it matches no centre at all.
         """
-        avg = 0.5 * ((reflected[0] if len(reflected) > 0 else 0)
-                     + (reflected[1] if len(reflected) > 1 else 0))
-        
-        if abs(reflected[0] - reflected[1]) >= self.ALLOWED_SENSOR_OFFSET:
-            return UNKNOWN, avg
+        value = reflected[self.sensor_index]
 
-        colour = self._classify(avg)
+        colour = self._classify(value)
 
-        return colour, avg
+        return colour, value

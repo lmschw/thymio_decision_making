@@ -112,6 +112,7 @@ class CrossInhibitionBaselineExperiment:
             num_options=self.num_options,
             option_centers=self.config.get("option_centers"),
             allowed_offset=self.config.get("allowed_offset", 50),
+            sensor_index=self.config.get("ground_sensor"),
         )
 
         # --- opinion state ---

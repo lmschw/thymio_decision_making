@@ -1,3 +1,15 @@
+# # Uses the LEFT sensor. "sensor" can be left out: 0 (left) is the default.
+# thymio-06:
+#   sensor: 0
+#   option_centers: [56, 409, 890]    # black, grey, white
+#   allowed_offsets: [20, 90, 10]
+
+# # Uses the RIGHT sensor
+# thymio-07:
+#   sensor: 1
+#   option_centers: [210, 690, 1010]  # black, grey, white (right sensor's own readings)
+#   allowed_offsets: [30, 100, 15]
+
 thymio-01:
   option_centers: [42, 444, 718]
   allowed_offsets: [20, 100, 10]
