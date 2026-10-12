@@ -12,7 +12,7 @@
 
 thymio-01:
   sensor: 0 # slight preference
-  option_centers: [53, 501, 841]
+  option_centers: [53, 501, 861]
   allowed_offsets: [20, 25, 10]
 
 thymio-03:
@@ -22,8 +22,8 @@ thymio-03:
 
 thymio-04:
   sensor: 1 # slight preference
-  option_centers: [26, 276, 459]
-  allowed_offsets: [20, 25, 10]
+  option_centers: [26, 276, 479]
+  allowed_offsets: [20, 55, 10]
 
 thymio-06:
   sensor: 1 # slight preference
@@ -32,8 +32,8 @@ thymio-06:
 
 thymio-07:
   sensor: 1 # slight preference
-  option_centers: [41, 376, 655]
-  allowed_offsets: [20, 25, 10]
+  option_centers: [41, 376, 675]
+  allowed_offsets: [20, 55, 10]
 
 thymio-08:
   sensor: 1 # slight preference
@@ -62,8 +62,8 @@ thymio-12:
 
 thymio-13:
   sensor: 1
-  option_centers: [105, 827, 925]
-  allowed_offsets: [20, 25, 10]
+  option_centers: [105, 797, 905]
+  allowed_offsets: [50, 45, 10]
 
 thymio-14:
   sensor: 0 # both good
@@ -91,7 +91,7 @@ thymio-18:
 
 thymio-19:
   sensor: 1 # both good
-  option_centers: [40, 320, 540]
+  option_centers: [40, 320, 560]
   allowed_offsets: [20, 25, 10]
 
 thymio-20:
@@ -100,7 +100,7 @@ thymio-20:
 
 thymio-21:
   sensor: 1 # both good
-  option_centers: [81, 258, 379]
+  option_centers: [81, 258, 399]
   allowed_offsets: [20, 25, 10]
 
 thymio-23:
