@@ -11,92 +11,112 @@
 #   allowed_offsets: [30, 100, 15]
 
 thymio-01:
-  option_centers: [42, 444, 718]
-  allowed_offsets: [20, 100, 10]
+  sensor: 0 # slight preference
+  option_centers: [53, 501, 841]
+  allowed_offsets: [20, 25, 10]
 
 thymio-03:
-  option_centers: [34, 309, 656]
-  allowed_offsets: [20, 60, 10]
+  sensor: 0 # both fine
+  option_centers: [34, 355, 625]
+  allowed_offsets: [20, 25, 10]
 
 thymio-04:
-  option_centers: [33, 319, 757]
-  allowed_offsets: [20, 60, 10]
+  sensor: 1 # slight preference
+  option_centers: [26, 276, 459]
+  allowed_offsets: [20, 25, 10]
 
 thymio-06:
-  option_centers: [56, 409, 890]
-  allowed_offsets: [20, 90, 10]
+  sensor: 1 # slight preference
+  option_centers: [62, 459, 731]
+  allowed_offsets: [20, 25, 10]
 
 thymio-07:
-  option_centers: [48, 431, 701]
-  allowed_offsets: [30, 65, 10]
+  sensor: 1 # slight preference
+  option_centers: [41, 376, 655]
+  allowed_offsets: [20, 25, 10]
 
 thymio-08:
-  option_centers: [78, 503, 630]
-  allowed_offsets: [25, 50, 10]
+  sensor: 1 # slight preference
+  option_centers: [86, 533, 678]
+  allowed_offsets: [20, 25, 10]
 
 thymio-09:
-  option_centers: [66, 487, 741]
-  allowed_offsets: [25, 90, 10]
+  sensor: 0 # slight preference
+  option_centers: [61, 417, 589]
+  allowed_offsets: [20, 25, 10]
 
 thymio-10:
-  option_centers: [29, 280, 648]
-  allowed_offsets: [20, 50, 10]
+  sensor: 1 # slight preference
+  option_centers: [33, 303, 536]
+  allowed_offsets: [20, 25, 10]
 
 thymio-11:
-  option_centers: [55, 386, 550]
-  allowed_offsets: [30, 100, 10]
+  sensor: 1 # strong preference
+  option_centers: [41, 302, 432]
+  allowed_offsets: [20, 25, 10]
 
 thymio-12:
-  option_centers: [84, 537, 773]
-  allowed_offsets: [20, 80, 10]
+  sensor: 1 # strong preference
+  option_centers: [88, 596, 736]
+  allowed_offsets: [20, 25, 10]
 
 thymio-13:
-  option_centers: [104, 393, 705]
+  sensor: 1
+  option_centers: [105, 827, 925]
   allowed_offsets: [20, 25, 10]
 
 thymio-14:
-  option_centers: [48, 309, 836]
-  allowed_offsets: [20, 30, 10]
+  sensor: 0 # both good
+  option_centers: [48, 324, 465]
+  allowed_offsets: [20, 25, 10]
 
 thymio-15:
   option_centers: [96, 643, 833]
   allowed_offsets: [20, 20, 10]
 
 thymio-16:
-  option_centers: [91, 627, 814]
-  allowed_offsets: [20, 60, 10]
+  sensor: 0 # both good
+  option_centers: [90, 650, 862]
+  allowed_offsets: [20, 50, 10]
 
 thymio-17:
-  option_centers: [66, 436, 704]
-  allowed_offsets: [30, 120, 10]
+  sensor: 1 # preference
+  option_centers: [78, 540, 709]
+  allowed_offsets: [20, 25, 10]
 
 thymio-18:
-  option_centers: [78, 512, 786]
-  allowed_offsets: [20, 40, 10]
+  sensor: 1 # strong preference
+  option_centers: [77, 546, 740]
+  allowed_offsets: [20, 25, 10]
 
 thymio-19:
-  option_centers: [45, 371, 556]
-  allowed_offsets: [20, 60, 10]
+  sensor: 1 # both good
+  option_centers: [40, 320, 540]
+  allowed_offsets: [20, 25, 10]
 
 thymio-20:
   option_centers: [49, 165, 622]
   allowed_offsets: [15, 35, 10]
 
 thymio-21:
-  option_centers: [86, 230, 713]
-  allowed_offsets: [20, 50, 10]
+  sensor: 1 # both good
+  option_centers: [81, 258, 379]
+  allowed_offsets: [20, 25, 10]
 
 thymio-23:
-  option_centers: [115, 666, 856]
-  allowed_offsets: [20, 50, 10]
+  sensor: 1 # both good
+  option_centers: [109, 693, 802]
+  allowed_offsets: [20, 25, 10]
 
 thymio-24:
-  option_centers: [82, 566, 713]
-  allowed_offsets: [20, 50, 10]
+  sensor: 1 # preference
+  option_centers: [77, 533, 728]
+  allowed_offsets: [20, 25, 10]
 
 thymio-25:
-  option_centers: [30, 247, 585]
-  allowed_offsets: [30, 130, 10]
+  sensor: 1 # slight preference
+  option_centers: [43, 357, 607]
+  allowed_offsets: [20, 25, 10]
 
 thymio-26:
   option_centers: [45, 452, 713]
