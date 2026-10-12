@@ -32,8 +32,8 @@ thymio-06:
 
 thymio-07:
   sensor: 1 # slight preference
-  option_centers: [45, 251, 549]
-  allowed_offsets: [50, 35, 10]
+  option_centers: [45, 350, 700]
+  allowed_offsets: [50, 50, 10]
 
 thymio-08:
   sensor: 1 # slight preference
