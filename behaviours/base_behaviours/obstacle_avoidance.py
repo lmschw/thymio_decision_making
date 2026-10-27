@@ -1,6 +1,26 @@
-import random
-
 class ObstacleAvoidance:
+    """
+    Obstacle avoidance using the Thymio's
+    7 horizontal proximity sensors (5 front, 2 back).
+
+    Two states:
+      - normal driving: goes straight on a clear path, or turns away from
+        the closest obstacle (turn direction held for a few steps to avoid
+        oscillations), until either the path clears or the turn gets too
+        long / an obstacle gets too close, both of which trigger backward.
+      - backward escape: reverse while the rear stays clear, then
+        pivot away from the closest obstacle, then go back to normal driving.
+
+    Parameters:
+      wheel_velocity (300): base wheel speed
+      delta (800): threshold to start turning away from an obstacle
+        (stored as min_prox)
+      max_prox (2500): threshold to trigger an immediate backward move
+      max_side (3500): threshold on left and right together that also
+        triggers backward
+      max_turn (15): max steps held in a turn before forcing backward
+      max_backward (10): steps spent reversing 
+    """
 
     def __init__(
         self,
@@ -10,112 +30,99 @@ class ObstacleAvoidance:
         self.wheel_velocity = wheel_velocity
         self.delta = delta
 
-        # Number of consecutive cycles spent escaping before
-        # trying normal driving again.
-        self.escape_steps = 8
-
-        # If we've had several failed escape attempts,
-        # make the next one longer.
-        self.max_escape_level = 3
-
-        self.escape_timer = 0
-        self.escape_level = 0
-
-        # None / "left" / "right"
+        self.count_backward = 0
+        self.count_turn = 0
+        self.max_backward = 10
+        self.max_turn = 15
+        self.backward = False
+        self.max_prox = 2500
+        self.max_side = 3500
+        self.min_prox = delta
         self.turn_direction = None
 
+
     def step_motion(self, prox):
+        """
+        Compute the next (left, right) wheel velocities from a proximity
+        reading.
 
-        f_front = max(prox[:5])
-        f_rear = max(prox[5:])
-
-        left_strength = prox[0] + prox[1]
-        right_strength = prox[3] + prox[4]
-
-        front_clear = f_front < self.delta * 0.6
-
-        # --------------------------------------------------
-        # Continue an escape manoeuvre
-        # --------------------------------------------------
-
-        if self.escape_timer > 0:
-
-            self.escape_timer -= 1
-
-            # Once the front is genuinely clear,
-            # immediately return to normal driving.
-            if front_clear:
-                self.escape_timer = 0
-                self.escape_level = 0
+        prox: list of 7 horizontal proximity sensor values (indices 0-4
+        front, 5-6 back). Higher values mean closer obstacle.
+        Returns: (left_velocity, right_velocity).
+        """
+        left = prox[0] + prox[1]
+        right = prox[3] + prox[4]
+        closer = max(prox[:5])
+        factor = self._factor(closer)
+        if not self.backward: 
+            if closer >= self.max_prox or (left >= self.max_side and right >= self.max_side):
+                self.backward = True
                 self.turn_direction = None
+                self.count_turn = 0
+                return -self.wheel_velocity, -self.wheel_velocity
+            elif closer >= self.min_prox:
+                if self.turn_direction is not None and self.count_turn < self.max_turn:
+                    self.count_turn += 1
+                    if self.turn_direction == "right" and (right - left) > 400:
+                        self.turn_direction = "left"
+                    elif self.turn_direction == "left" and (left - right) > 400:
+                        self.turn_direction = "right"
 
-            else:
-
-                if self.turn_direction == "left":
+                    if self.turn_direction == "right":
+                        return self.wheel_velocity, self.wheel_velocity * max(0, 1 - 2 * factor)
+                    else:
+                        return self.wheel_velocity * max(0, 1 - 2 * factor), self.wheel_velocity
+                elif self.turn_direction is not None and self.count_turn >= self.max_turn:
+                    self.backward = True
+                    self.turn_direction = None
+                    self.count_turn = 0
+                    return -self.wheel_velocity, -self.wheel_velocity
+                else:
+                    self.count_turn = 0
+                    if left > right:
+                        self.turn_direction = "right"
+                        return self.wheel_velocity, self.wheel_velocity * max(0, 1 - 2 * factor)
+                    else:
+                        self.turn_direction = "left"
+                        return self.wheel_velocity * max(0, 1 - 2 * factor), self.wheel_velocity
+            else:  
+                self.turn_direction = None
+                self.count_turn = 0
+                return self.wheel_velocity, self.wheel_velocity
+        else:
+            self.count_backward += 1
+            if self.count_backward < self.max_backward and prox[5] < self.min_prox and prox[6] < self.min_prox:
+                return -self.wheel_velocity, -self.wheel_velocity
+            elif self.count_backward < self.max_backward and (prox[5] >= self.min_prox or prox[6] >= self.min_prox):
+                self.count_backward = self.max_backward
+                if left > right:
+                    self.turn_direction = "right"
                     return self.wheel_velocity, -self.wheel_velocity
                 else:
-                    return -self.wheel_velocity, self.wheel_velocity
-
-        # --------------------------------------------------
-        # Front obstacle
-        # --------------------------------------------------
-
-        if f_front > self.delta:
-
-            # Pick a direction ONCE.
-            if self.turn_direction is None:
-
-                difference = left_strength - right_strength
-
-                if abs(difference) < 200:
-                    # Symmetric wall / another robot.
-                    self.turn_direction = random.choice(["left", "right"])
-
-                elif difference > 0:
-                    # More obstacle on the left -> turn right.
-                    self.turn_direction = "right"
-
-                else:
                     self.turn_direction = "left"
-
-            self.escape_level = min(
-                self.escape_level + 1,
-                self.max_escape_level
-            )
-
-            self.escape_timer = (
-                self.escape_steps
-                + 2 * self.escape_level
-            )
-
-            if self.turn_direction == "left":
-                return -self.wheel_velocity, self.wheel_velocity
+                    return -self.wheel_velocity, self.wheel_velocity
+            elif self.count_backward >= self.max_backward and self.count_backward < (self.max_backward + 5):
+                if self.turn_direction is None :
+                    if left > right:
+                        self.turn_direction = "right"
+                        return self.wheel_velocity, -self.wheel_velocity
+                    else:
+                        self.turn_direction = "left"
+                        return -self.wheel_velocity, self.wheel_velocity
+                elif self.turn_direction == "right" : 
+                    return self.wheel_velocity, -self.wheel_velocity
+                else : 
+                    return -self.wheel_velocity, self.wheel_velocity
             else:
-                return self.wheel_velocity, -self.wheel_velocity
+                self.count_backward = 0
+                self.backward = False
+                self.turn_direction = None
+                return self.wheel_velocity, self.wheel_velocity
 
-        # --------------------------------------------------
-        # Rear obstacle
-        # --------------------------------------------------
-
-        if f_rear > self.delta:
-
-            if left_strength > right_strength:
-                return self.wheel_velocity, 0
-            else:
-                return 0, self.wheel_velocity
-
-        # --------------------------------------------------
-        # Gentle steering
-        # --------------------------------------------------
-
-        error = left_strength - right_strength
-
-        steer = 0.015 * error
-
-        left = self.wheel_velocity + steer
-        right = self.wheel_velocity - steer
-
-        left = max(40, min(self.wheel_velocity, left))
-        right = max(40, min(self.wheel_velocity, right))
-
-        return int(left), int(right)
+    def _factor(self, closer):
+        """
+        Normalise the closest obstacle reading to [0, 1] between
+        min_prox and 4500, used to scale how sharply the robot turns.
+        """
+        factor = (closer - self.min_prox) / (4500 - self.min_prox)
+        return max(0.0, min(1.0, factor))
