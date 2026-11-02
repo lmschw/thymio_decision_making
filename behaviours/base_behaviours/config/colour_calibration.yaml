@@ -41,9 +41,9 @@ thymio-08:
   allowed_offsets: [15, 25, 10]
 
 thymio-09:
-  sensor: 1 
-  option_centers: [118, 654, 920]
-  allowed_offsets: [20, 25, 10]
+  sensor: 0 
+  option_centers: [44, 396, 668]
+  allowed_offsets: [15, 20, 15]
 
 thymio-10:
   sensor: 0 
