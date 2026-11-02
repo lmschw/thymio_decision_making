@@ -11,117 +11,108 @@
 #   allowed_offsets: [30, 100, 15]
 
 thymio-01:
-  sensor: 0 # slight preference
-  option_centers: [53, 501, 861]
-  allowed_offsets: [20, 25, 10]
-
-thymio-03:
-  sensor: 0 # both fine
-  option_centers: [34, 355, 625]
-  allowed_offsets: [20, 25, 10]
+  sensor: 1 
+  option_centers: [99, 603, 826]
+  allowed_offsets: [15, 35, 10]
 
 thymio-04:
-  sensor: 1 # slight preference
-  option_centers: [28, 314, 570]
-  allowed_offsets: [50, 35, 10]
+  sensor: 1 
+  option_centers: [61, 442, 602]
+  allowed_offsets: [15, 20, 10]
 
 thymio-06:
-  sensor: 1 # slight preference
-  option_centers: [62, 459, 731]
-  allowed_offsets: [20, 25, 10]
+  sensor: 1 
+  option_centers: [56, 441, 805]
+  allowed_offsets: [20, 170, 10]
 
 thymio-07:
-  sensor: 1 # slight preference
-  option_centers: [45, 350, 700]
-  allowed_offsets: [50, 50, 10]
-
+  sensor: 0 
+  option_centers: [42, 319, 537]
+  allowed_offsets: [15, 65, 10]
+  
 thymio-08:
-  sensor: 1 # slight preference
-  option_centers: [86, 533, 678]
-  allowed_offsets: [20, 25, 10]
+  sensor: 1 
+  option_centers: [104, 614, 787]
+  allowed_offsets: [15, 25, 10]
 
 thymio-09:
-  sensor: 0 # slight preference
-  option_centers: [61, 417, 589]
+  sensor: 1 
+  option_centers: [118, 654, 920]
   allowed_offsets: [20, 25, 10]
 
 thymio-10:
-  sensor: 1 # slight preference
-  option_centers: [33, 303, 536]
-  allowed_offsets: [20, 25, 10]
+  sensor: 0 
+  option_centers: [130, 620, 920]
+  allowed_offsets: [15, 75, 15]
+
 
 thymio-11:
-  sensor: 1 # strong preference
-  option_centers: [41, 302, 432]
-  allowed_offsets: [20, 25, 10]
+  sensor: 1 
+  option_centers: [81, 506, 696]
+  allowed_offsets: [15, 15, 26]
+
+
 
 thymio-12:
-  sensor: 1 # strong preference
-  option_centers: [88, 596, 736]
-  allowed_offsets: [20, 25, 10]
+  sensor: 1 
+  option_centers: [98, 603, 779]
+  allowed_offsets: [15, 53, 20]
 
 thymio-13:
   sensor: 1
-  option_centers: [48, 425, 773]
-  allowed_offsets: [50, 30, 10]
+  option_centers: [49, 494, 843]
+  allowed_offsets: [15, 15, 43]
+
 
 thymio-14:
-  sensor: 0 # both good
-  option_centers: [48, 324, 465]
-  allowed_offsets: [20, 25, 10]
+  sensor: 0 
+  option_centers: [53, 346, 504]
+  allowed_offsets: [15, 20, 15]
 
-thymio-15:
-  option_centers: [96, 643, 833]
-  allowed_offsets: [20, 20, 10]
 
 thymio-16:
-  sensor: 0 # both good
-  option_centers: [90, 650, 862]
-  allowed_offsets: [20, 50, 10]
+  sensor: 0 
+  option_centers: [104, 592, 867]
+  allowed_offsets: [15, 45, 45]
 
 thymio-17:
-  sensor: 1 # preference
-  option_centers: [78, 540, 709]
-  allowed_offsets: [20, 25, 10]
+  sensor: 1 
+  option_centers: [88, 549, 742]
+  allowed_offsets: [15, 30, 32]
+
 
 thymio-18:
-  sensor: 1 # strong preference
-  option_centers: [77, 546, 740]
-  allowed_offsets: [20, 25, 10]
+  sensor: 1 
+  option_centers: [95, 606, 830]
+  allowed_offsets: [15, 38, 26]
+
 
 thymio-19:
-  sensor: 1 # both good
-  option_centers: [40, 320, 560]
-  allowed_offsets: [20, 25, 10]
-
-thymio-20:
-  option_centers: [49, 165, 622]
-  allowed_offsets: [15, 35, 10]
+  sensor: 0 
+  option_centers: [57, 404, 634]
+  allowed_offsets: [15, 25, 33]
 
 thymio-21:
-  sensor: 1 # both good
-  option_centers: [84, 512, 676]
-  allowed_offsets: [40, 35, 10]
+  sensor: 1 
+  option_centers: [86, 511, 670]
+  allowed_offsets: [15, 38, 25]
 
 thymio-23:
-  sensor: 1 # both good
-  option_centers: [109, 693, 802]
-  allowed_offsets: [20, 25, 10]
+  sensor: 1 
+  option_centers: [45, 405, 656]
+  allowed_offsets: [15, 27, 18]
+
 
 thymio-24:
-  sensor: 1 # preference
-  option_centers: [77, 533, 728]
-  allowed_offsets: [20, 25, 10]
+  sensor: 1 
+  option_centers: [75, 532, 747]
+  allowed_offsets: [25, 35, 25]
+
 
 thymio-25:
-  sensor: 1 # slight preference
-  option_centers: [43, 357, 607]
-  allowed_offsets: [20, 25, 10]
+  sensor: 1 
+  option_centers: [55, 448, 741]
+  allowed_offsets: [15, 25, 20]
 
-thymio-26:
-  option_centers: [45, 452, 713]
-  allowed_offsets: [20, 100, 10]
 
-thymio-27:
-  option_centers: [45, 452, 713]
-  allowed_offsets: [20, 100, 10]
+
