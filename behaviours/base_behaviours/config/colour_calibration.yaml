@@ -15,6 +15,11 @@ thymio-01:
   option_centers: [99, 603, 826]
   allowed_offsets: [15, 35, 10]
 
+thymio-03:
+  sensor: 1 
+  option_centers: [104, 688, 916]
+  allowed_offsets: [15, 35, 20]
+
 thymio-04:
   sensor: 1 
   option_centers: [61, 442, 602]
